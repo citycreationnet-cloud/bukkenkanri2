@@ -1,0 +1,1903 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>不動産物件管理システム</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    :root {
+      --primary: #1a3a5c;
+      --primary-light: #2c5282;
+      --accent: #d4a017;
+      --accent-light: #e8b93d;
+      --bg: #f0f4f8;
+      --card: #ffffff;
+      --sidebar: #1a3a5c;
+      --text: #2d3748;
+      --text-muted: #718096;
+      --border: #e2e8f0;
+      --success: #38a169;
+      --warning: #dd6b20;
+      --danger: #e53e3e;
+      --info: #3182ce;
+      --radius: 8px;
+      --shadow: 0 1px 6px rgba(0,0,0,0.08);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Meiryo', sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; height: 100vh; overflow: hidden; font-size: 14px;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar { width: 210px; background: var(--sidebar); color:#fff; display:flex; flex-direction:column; flex-shrink:0; }
+    .sidebar-logo { padding:18px 16px 14px; border-bottom:1px solid rgba(255,255,255,.1); }
+    .sidebar-logo .logo-mark { font-size:22px; }
+    .sidebar-logo h1 { font-size:13px; font-weight:700; color:var(--accent-light); line-height:1.4; margin-top:4px; }
+    .sidebar-logo .sub { font-size:10px; color:rgba(255,255,255,.4); margin-top:2px; }
+    .sidebar-nav { flex:1; padding:10px 0; overflow-y:auto; }
+    .nav-item {
+      display:flex; align-items:center; gap:9px;
+      padding:9px 16px; cursor:pointer;
+      color:rgba(255,255,255,.65); font-size:13px;
+      transition:all .18s; border-left:3px solid transparent;
+    }
+    .nav-item:hover { background:rgba(255,255,255,.07); color:#fff; }
+    .nav-item.active { background:rgba(255,255,255,.11); color:#fff; border-left-color:var(--accent); }
+    .nav-icon { font-size:15px; width:18px; text-align:center; }
+    .nav-badge {
+      margin-left:auto; background:var(--accent); color:#fff;
+      font-size:10px; font-weight:700;
+      padding:1px 6px; border-radius:10px; min-width:20px; text-align:center;
+    }
+    .sidebar-footer { padding:12px; border-top:1px solid rgba(255,255,255,.1); display:flex; flex-direction:column; gap:6px; }
+    .sidebar-footer .btn { width:100%; font-size:11px; justify-content:center; }
+
+    /* ── Main ── */
+    .main { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+    .topbar {
+      background:#fff; border-bottom:1px solid var(--border);
+      padding:10px 20px; display:flex; align-items:center; gap:12px;
+    }
+    .page-title { font-size:15px; font-weight:700; color:var(--primary); white-space:nowrap; }
+    .search-wrap {
+      flex:1; max-width:340px;
+      display:flex; align-items:center; gap:6px;
+      background:var(--bg); border:1px solid var(--border);
+      border-radius:20px; padding:6px 14px;
+    }
+    .search-wrap input { border:none; background:transparent; font-size:12px; outline:none; width:100%; color:var(--text); }
+    .content { flex:1; overflow-y:auto; padding:18px 20px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display:inline-flex; align-items:center; gap:5px;
+      padding:7px 14px; border-radius:var(--radius);
+      border:none; cursor:pointer;
+      font-size:13px; font-weight:500;
+      transition:opacity .15s, filter .15s; font-family:inherit;
+    }
+    .btn:hover { filter:brightness(1.08); }
+    .btn:active { filter:brightness(.95); }
+    .btn-primary { background:var(--primary); color:#fff; }
+    .btn-accent  { background:var(--accent); color:#fff; }
+    .btn-secondary { background:#fff; color:var(--text); border:1px solid var(--border); }
+    .btn-danger  { background:var(--danger); color:#fff; }
+    .btn-sm  { padding:4px 10px; font-size:12px; }
+    .btn-xs  { padding:2px 7px; font-size:11px; border-radius:5px; }
+
+    /* ── Cards ── */
+    .card { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; }
+    .card-header { padding:12px 16px; border-bottom:1px solid var(--border); font-size:13px; font-weight:700; color:var(--primary); }
+
+    /* ── Stats ── */
+    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px; }
+    .stat-card { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:14px 16px; }
+    .stat-label { font-size:11px; color:var(--text-muted); }
+    .stat-value { font-size:26px; font-weight:800; margin:2px 0; }
+    .stat-sub   { font-size:11px; color:var(--text-muted); }
+
+    /* ── Status badges ── */
+    .badge { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; }
+    .badge-検討中 { background:#ebf8ff; color:#2b6cb0; }
+    .badge-申込中 { background:#fffaf0; color:#c05621; }
+    .badge-成約   { background:#f0fff4; color:#276749; }
+    .badge-見送り { background:#f7fafc; color:#718096; border:1px solid #e2e8f0; }
+    .badge-未提案 { background:#f7fafc; color:#a0aec0; border:1px solid #e2e8f0; }
+    .badge-type   { background:#edf2f7; color:#4a5568; }
+
+    /* ── Property Grid ── */
+    .prop-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:14px; }
+    .prop-card {
+      background:#fff; border-radius:var(--radius);
+      box-shadow:var(--shadow); border:1px solid var(--border);
+      cursor:pointer; transition:transform .18s, box-shadow .18s; overflow:hidden;
+    }
+    .prop-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-md); }
+    .prop-card-hd {
+      background:var(--primary); color:#fff; padding:10px 12px;
+      display:flex; align-items:center; justify-content:space-between; gap:6px;
+    }
+    .prop-card-hd .name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .prop-thumb { height:110px; background:#f7fafc; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .prop-thumb canvas { max-width:100%; max-height:100%; display:block; }
+    .prop-thumb .no-pdf { text-align:center; color:var(--text-muted); font-size:11px; line-height:1.8; }
+    .prop-body { padding:10px 12px; }
+    .prop-location { font-size:11px; color:var(--text-muted); margin-bottom:5px; }
+    .prop-price { font-size:17px; font-weight:800; color:var(--primary); margin-bottom:6px; }
+    .prop-specs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; }
+    .prop-spec-tag { font-size:10px; background:var(--bg); color:var(--text-muted); padding:2px 6px; border-radius:4px; }
+    .prop-customers { font-size:10px; color:var(--text-muted); }
+    .prop-card-ft { padding:7px 12px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+
+    /* ── Table ── */
+    .tbl-wrap { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); overflow:auto; }
+    table { width:100%; border-collapse:collapse; }
+    th { background:var(--bg); padding:9px 12px; font-size:11px; font-weight:700; color:var(--text-muted); text-align:left; border-bottom:2px solid var(--border); white-space:nowrap; }
+    td { padding:9px 12px; font-size:12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    tbody tr { cursor:pointer; }
+    tbody tr:hover td { background:#f7fbff; }
+    tbody tr:last-child td { border-bottom:none; }
+
+    /* ── Filters ── */
+    .filter-bar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center; }
+    .f-select { font-size:12px; padding:5px 10px; border:1px solid var(--border); border-radius:6px; background:#fff; cursor:pointer; outline:none; color:var(--text); }
+    .view-toggle { display:flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+    .view-toggle button { padding:5px 10px; border:none; background:#fff; cursor:pointer; font-size:14px; transition:all .15s; }
+    .view-toggle button.active { background:var(--primary); color:#fff; }
+
+    /* ── Modal ── */
+    .overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.48);
+      display:flex; align-items:center; justify-content:center;
+      z-index:1000; padding:16px;
+    }
+    .modal { background:#fff; border-radius:12px; box-shadow:0 16px 48px rgba(0,0,0,.22); width:100%; max-width:660px; max-height:92vh; display:flex; flex-direction:column; }
+    .modal-xl { max-width:1020px; }
+    .modal-hd { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+    .modal-title    { font-size:15px; font-weight:700; }
+    .modal-subtitle { font-size:11px; color:var(--text-muted); margin-top:2px; }
+    .modal-close {
+      cursor:pointer; color:var(--text-muted); font-size:20px; line-height:1; flex-shrink:0;
+      width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+      border-radius:6px; transition:background .15s;
+    }
+    .modal-close:hover { background:var(--bg); }
+    .modal-body { overflow-y:auto; padding:18px 20px; flex:1; }
+    .modal-ft { padding:12px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; }
+
+    /* ── Forms ── */
+    .form-sec { margin-bottom:18px; }
+    .form-sec-title { font-size:12px; font-weight:700; color:var(--primary); text-transform:uppercase; letter-spacing:.5px; padding-bottom:6px; margin-bottom:10px; border-bottom:2px solid var(--accent); }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .form-group { margin-bottom:10px; }
+    label { display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px; }
+    .req { color:var(--danger); }
+    input[type=text], input[type=number], input[type=tel], input[type=email], input[type=password],
+    select, textarea {
+      width:100%; padding:7px 10px;
+      border:1px solid var(--border); border-radius:6px;
+      font-size:13px; color:var(--text); background:#fff;
+      outline:none; transition:border-color .15s, background .3s; font-family:inherit;
+    }
+    input:focus, select:focus, textarea:focus { border-color:var(--primary-light); }
+    textarea { resize:vertical; min-height:76px; }
+
+    /* PDF upload */
+    .pdf-drop {
+      border:2px dashed var(--border); border-radius:var(--radius);
+      padding:18px; text-align:center; cursor:pointer;
+      transition:border-color .2s, background .2s;
+    }
+    .pdf-drop:hover, .pdf-drop.over { border-color:var(--primary); background:#f0f4f8; }
+    .pdf-drop-icon { font-size:28px; margin-bottom:6px; }
+    .pdf-drop-text { font-size:12px; color:var(--text-muted); }
+    .pdf-drop-sub  { font-size:10px; color:#a0aec0; margin-top:3px; }
+    .pdf-ready {
+      display:flex; align-items:center; gap:10px;
+      padding:10px 12px; border-radius:var(--radius);
+      background:#f0fff4; border:1px solid #9ae6b4;
+    }
+    .pdf-ready .pname { font-size:12px; font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+    /* Customer select */
+    .cust-select-list { border:1px solid var(--border); border-radius:6px; max-height:140px; overflow-y:auto; }
+    .cust-select-item { display:flex; align-items:center; gap:8px; padding:7px 12px; font-size:12px; cursor:pointer; }
+    .cust-select-item:hover { background:var(--bg); }
+    .cust-select-item input { margin:0; cursor:pointer; }
+
+    /* Customer chips */
+    .chip-row { display:flex; flex-wrap:wrap; gap:6px; }
+    .chip { display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:3px 9px; border-radius:12px; background:var(--primary); color:#fff; cursor:pointer; }
+    .chip:hover { background:var(--primary-light); }
+
+    /* Detail layout */
+    .detail-cols  { display:grid; grid-template-columns:1fr 300px; gap:18px; }
+    .detail-sec   { margin-bottom:14px; }
+    .detail-sec-title { font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+    .info-grid    { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+    .info-cell    { background:var(--bg); padding:8px 10px; border-radius:6px; }
+    .info-cell .il { font-size:10px; color:var(--text-muted); }
+    .info-cell .iv { font-size:13px; font-weight:500; margin-top:2px; }
+
+    /* PDF viewer */
+    .pdf-viewer { background:#3a3a3a; border-radius:var(--radius); overflow:hidden; }
+    .pdf-tb { background:#2d2d2d; padding:7px 10px; display:flex; align-items:center; gap:8px; }
+    .pdf-tb button { background:rgba(255,255,255,.12); border:none; color:#fff; padding:3px 9px; border-radius:4px; cursor:pointer; font-size:12px; font-family:inherit; }
+    .pdf-tb button:hover { background:rgba(255,255,255,.22); }
+    .pdf-tb .pinfo { color:rgba(255,255,255,.55); font-size:11px; }
+    .pdf-canvas-wrap { overflow-y:auto; max-height:460px; padding:12px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+    .pdf-canvas-wrap canvas { max-width:100%; box-shadow:0 4px 12px rgba(0,0,0,.35); }
+    .pdf-no { padding:28px; text-align:center; color:#888; font-size:12px; }
+
+    /* Progress bars */
+    .prog-row { display:flex; align-items:center; gap:10px; margin-bottom:9px; }
+    .prog-bar  { flex:1; background:var(--bg); border-radius:4px; height:5px; overflow:hidden; }
+    .prog-fill { height:5px; border-radius:4px; background:var(--primary); }
+
+    /* Toast */
+    .toast-wrap { position:fixed; bottom:18px; right:18px; z-index:2000; display:flex; flex-direction:column; gap:7px; }
+    .toast { background:#2d3748; color:#fff; padding:9px 16px; border-radius:8px; font-size:13px; box-shadow:0 4px 12px rgba(0,0,0,.2); animation:toastIn .25s ease; pointer-events:none; }
+    .toast.ok  { background:var(--success); }
+    .toast.err { background:var(--danger); }
+    @keyframes toastIn { from { transform:translateX(110%); opacity:0; } to { transform:none; opacity:1; } }
+
+    /* Empty */
+    .empty { text-align:center; padding:60px 20px; color:var(--text-muted); }
+    .empty-icon  { font-size:44px; margin-bottom:12px; }
+    .empty-title { font-size:15px; font-weight:700; color:var(--text); margin-bottom:6px; }
+    .empty-desc  { font-size:12px; }
+
+    /* ══ AI Auto-fill ══ */
+    /* Highlight fields filled by AI */
+    .ai-filled {
+      border-color: #4299e1 !important;
+      background: #ebf8ff !important;
+    }
+
+    /* Spinner */
+    .spin { display:inline-block; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* AI badge */
+    .ai-badge {
+      display:inline-flex; align-items:center; gap:3px;
+      font-size:10px; padding:2px 7px; border-radius:10px;
+      background:#bee3f8; color:#2b6cb0; font-weight:600; white-space:nowrap; flex-shrink:0;
+    }
+
+    /* AI hint bar shown in property form */
+    .ai-hint-bar {
+      display:flex; align-items:center; gap:10px;
+      background:#ebf8ff; border:1px solid #bee3f8;
+      border-radius:7px; padding:9px 12px; margin-bottom:14px; font-size:12px; color:#2b6cb0;
+    }
+    .ai-hint-bar.warn {
+      background:#fffbeb; border-color:#fef08a; color:#92400e;
+    }
+
+    /* Settings form */
+    .api-key-input { font-family:monospace; letter-spacing:.04em; }
+    .settings-note {
+      font-size:11px; color:var(--text-muted);
+      background:#fffbeb; border:1px solid #fef08a;
+      padding:10px 12px; border-radius:6px; line-height:1.6;
+    }
+
+    /* Extracting overlay inside pdf-drop */
+    .extracting-inner {
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; gap:8px; padding:6px;
+    }
+    .extracting-inner .ext-spin { font-size:26px; }
+    .extracting-inner .ext-label { font-size:12px; color:var(--text-muted); }
+    .extracting-inner .ext-fname { font-size:10px; color:#a0aec0; }
+
+    ::-webkit-scrollbar { width:5px; height:5px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:#cbd5e0; border-radius:3px; }
+    ::-webkit-scrollbar-thumb:hover { background:#a0aec0; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">🏠</div>
+    <h1>不動産物件<br>管理システム</h1>
+    <div class="sub">Property Manager</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-item active" data-view="props"  onclick="nav('props')">
+      <span class="nav-icon">🏢</span><span>物件一覧</span>
+      <span class="nav-badge" id="nb-props">0</span>
+    </div>
+    <div class="nav-item" data-view="custs"  onclick="nav('custs')">
+      <span class="nav-icon">👥</span><span>顧客管理</span>
+      <span class="nav-badge" id="nb-custs">0</span>
+    </div>
+    <div class="nav-item" data-view="agents" onclick="nav('agents')">
+      <span class="nav-icon">🏪</span><span>業者管理</span>
+      <span class="nav-badge" id="nb-agents">0</span>
+    </div>
+    <div class="nav-item" data-view="dash"   onclick="nav('dash')">
+      <span class="nav-icon">📊</span><span>ダッシュボード</span>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <button class="btn btn-accent btn-sm"     onclick="showSettings()">✨ AI自動入力設定</button>
+    <button class="btn btn-secondary btn-sm"  onclick="exportAll()">💾 データ書き出し</button>
+    <button class="btn btn-secondary btn-sm"  onclick="importAll()">📥 データ読み込み</button>
+    <input type="file" id="imp-file" accept=".json" style="display:none" onchange="onImport(event)">
+  </div>
+</div>
+
+<!-- ════════════════ MAIN ════════════════ -->
+<div class="main">
+  <div class="topbar">
+    <div class="page-title" id="pg-title">物件一覧</div>
+    <div class="search-wrap">
+      <span style="font-size:13px;color:var(--text-muted)">🔍</span>
+      <input type="text" id="srch" placeholder="物件名・所在地・業者名…" oninput="onSearch()">
+    </div>
+    <button class="btn btn-accent" id="add-btn" onclick="onAdd()">＋ 新規登録</button>
+  </div>
+  <div class="content" id="cnt"></div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+<div id="mc"></div>
+
+<!-- ═══════════════ SCRIPT ═══════════════ -->
+<script>
+/* ─── PDF.js ─── */
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+/* ══════════════════════════════════════════════
+   IndexedDB (PDF binary storage)
+══════════════════════════════════════════════ */
+let idb = null;
+function openIDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('fudosanPDFs', 1);
+    r.onupgradeneeded = e => {
+      if (!e.target.result.objectStoreNames.contains('pdfs'))
+        e.target.result.createObjectStore('pdfs', { keyPath: 'id' });
+    };
+    r.onsuccess = e => { idb = e.target.result; res(); };
+    r.onerror   = () => rej(r.error);
+  });
+}
+function dbSave(id, fileName, data) {
+  return new Promise((res, rej) => {
+    if (!idb) { res(); return; }
+    const tx = idb.transaction('pdfs', 'readwrite');
+    tx.objectStore('pdfs').put({ id, fileName, data });
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+  });
+}
+function dbGet(id) {
+  return new Promise(res => {
+    if (!idb) { res(null); return; }
+    const r = idb.transaction('pdfs', 'readonly').objectStore('pdfs').get(id);
+    r.onsuccess = () => res(r.result || null);
+    r.onerror   = () => res(null);
+  });
+}
+function dbDel(id) {
+  return new Promise(res => {
+    if (!idb) { res(); return; }
+    const tx = idb.transaction('pdfs', 'readwrite');
+    tx.objectStore('pdfs').delete(id);
+    tx.oncomplete = res; tx.onerror = res;
+  });
+}
+
+/* ══════════════════════════════════════════════
+   localStorage (structured data)
+══════════════════════════════════════════════ */
+const LS = 'fudosanData', LS_CFG = 'fudosanConfig';
+function loadData() {
+  try { const r = localStorage.getItem(LS); if (r) return JSON.parse(r); } catch(_) {}
+  return { properties: [], customers: [], agents: [] };
+}
+function save() { localStorage.setItem(LS, JSON.stringify(D)); refreshBadges(); }
+
+/* ══════════════════════════════════════════════
+   Settings (API key, model)
+══════════════════════════════════════════════ */
+function getCfg() {
+  try { return JSON.parse(localStorage.getItem(LS_CFG)) || {}; } catch(_) { return {}; }
+}
+function saveCfg(cfg) { localStorage.setItem(LS_CFG, JSON.stringify(cfg)); }
+
+/* ══════════════════════════════════════════════
+   State
+══════════════════════════════════════════════ */
+let D     = loadData();
+let view  = 'props', q = '', vmode = 'grid';
+let pf    = { status: '', custId: '', agentId: '', type: '' };
+let _pdf  = null;
+let _pendingFile = null;
+
+/* ══════════════════════════════════════════════
+   Util
+══════════════════════════════════════════════ */
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const ea  = s => String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+function formatPrice(v) {
+  const n = parseInt(v);
+  if (!n) return '価格未設定';
+  if (n >= 10000) {
+    const o = Math.floor(n/10000), m = n % 10000;
+    return m ? `${o}億${m.toLocaleString()}万円` : `${o}億円`;
+  }
+  return `${n.toLocaleString()}万円`;
+}
+function refreshBadges() {
+  document.getElementById('nb-props').textContent  = D.properties.length;
+  document.getElementById('nb-custs').textContent  = D.customers.length;
+  document.getElementById('nb-agents').textContent = D.agents.length;
+}
+
+/* ══════════════════════════════════════════════
+   Toast
+══════════════════════════════════════════════ */
+function toast(msg, type='') {
+  const w  = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' '+type : '');
+  el.textContent = msg;
+  w.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+/* ══════════════════════════════════════════════
+   Modal
+══════════════════════════════════════════════ */
+function showModal(html)  { document.getElementById('mc').innerHTML = `<div class="overlay" onclick="overlayClose(event)">${html}</div>`; }
+function closeModal()     { document.getElementById('mc').innerHTML = ''; _pendingFile = null; }
+function overlayClose(e)  { if (e.target.classList.contains('overlay')) closeModal(); }
+
+/* ══════════════════════════════════════════════
+   Navigation
+══════════════════════════════════════════════ */
+function nav(v) {
+  view = v;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === v));
+  const titles = { props:'物件一覧', custs:'顧客管理', agents:'業者管理', dash:'ダッシュボード' };
+  document.getElementById('pg-title').textContent = titles[v];
+  document.getElementById('srch').value = ''; q = '';
+  render();
+}
+function onSearch() { q = document.getElementById('srch').value.toLowerCase(); render(); }
+function onAdd()    { const m = { props:'showPropModal', custs:'showCustModal', agents:'showAgentModal', dash:'showPropModal' }; window[m[view]](); }
+function render()   { const m = { props:renderProps, custs:renderCusts, agents:renderAgents, dash:renderDash }; m[view]?.(); }
+
+/* ══════════════════════════════════════════════
+   SETTINGS MODAL
+══════════════════════════════════════════════ */
+/* Provider-specific model lists */
+const MODELS = {
+  gemini: [
+    { v:'gemini-2.0-flash-lite',    l:'Gemini 2.0 Flash Lite（無料・安定）★推奨' },
+    { v:'gemini-1.5-flash',         l:'Gemini 1.5 Flash（無料・旧世代）' },
+    { v:'gemini-2.5-flash',         l:'Gemini 2.5 Flash（既存ユーザー向け）' },
+    { v:'gemini-2.5-flash-lite',    l:'Gemini 2.5 Flash Lite（既存ユーザー向け）' },
+  ],
+  claude: [
+    { v:'claude-3-5-haiku-20241022',  l:'claude-3-5-haiku（有料・高速）' },
+    { v:'claude-3-5-sonnet-20241022', l:'claude-3-5-sonnet（有料・高精度）' },
+  ]
+};
+// Gemini fallback order for new users
+const GEMINI_FALLBACKS = [
+  'gemini-2.0-flash-lite',
+  'gemini-2.0-flash-exp',
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash-lite',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-002',
+  'gemini-1.5-pro',
+  'gemini-pro',
+];
+
+// APIキーで実際に使えるモデル一覧を取得
+async function fetchAvailableGeminiModels(apiKey) {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`,
+      { headers: { 'content-type': 'application/json' } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.models || [])
+      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => m.name.replace('models/', ''))
+      // Flash系を優先（高速・低コスト）
+      .sort((a, b) => {
+        const score = s => s.includes('flash') ? 0 : s.includes('lite') ? 1 : 2;
+        return score(a) - score(b);
+      });
+  } catch(_) { return null; }
+}
+
+function providerModelOpts(provider, current) {
+  return (MODELS[provider]||[]).map(m =>
+    `<option value="${m.v}" ${current===m.v?'selected':''}>${esc(m.l)}</option>`
+  ).join('');
+}
+
+function showSettings() {
+  const c        = getCfg();
+  const provider = c.provider || 'gemini';
+  const model    = c.model    || 'gemini-2.0-flash-lite';
+
+  showModal(`
+    <div class="modal">
+      <div class="modal-hd">
+        <div>
+          <div class="modal-title">✨ AI自動入力設定</div>
+          <div class="modal-subtitle">販売図面PDFから物件情報を自動抽出します</div>
+        </div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;line-height:1.7">
+          販売図面をアップロードするだけで、AIが物件名・価格・間取り・業者名などを自動で読み取り入力欄に反映します。
+        </div>
+
+        <!-- Provider selection -->
+        <div class="form-group">
+          <label>AIサービス</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <label id="lbl-gemini" style="cursor:pointer;border:2px solid ${provider==='gemini'?'var(--accent)':'var(--border)'};border-radius:8px;padding:10px 12px;display:flex;gap:8px;align-items:flex-start" onclick="switchProvider('gemini')">
+              <input type="radio" name="s-provider" value="gemini" ${provider==='gemini'?'checked':''} style="margin-top:2px">
+              <div>
+                <div style="font-weight:700;font-size:13px">Google Gemini</div>
+                <div style="font-size:11px;color:var(--success);font-weight:600">✅ 無料で使える</div>
+                <div style="font-size:10px;color:var(--text-muted)">aistudio.google.com で取得</div>
+              </div>
+            </label>
+            <label id="lbl-claude" style="cursor:pointer;border:2px solid ${provider==='claude'?'var(--accent)':'var(--border)'};border-radius:8px;padding:10px 12px;display:flex;gap:8px;align-items:flex-start" onclick="switchProvider('claude')">
+              <input type="radio" name="s-provider" value="claude" ${provider==='claude'?'checked':''} style="margin-top:2px">
+              <div>
+                <div style="font-weight:700;font-size:13px">Anthropic Claude</div>
+                <div style="font-size:11px;color:var(--warning);font-weight:600">💳 有料（従量課金）</div>
+                <div style="font-size:10px;color:var(--text-muted)">console.anthropic.com で取得</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>使用モデル</label>
+          <select id="s-model">${providerModelOpts(provider, model)}</select>
+        </div>
+
+        <div class="form-group">
+          <label>APIキー <span class="req">*</span></label>
+          <input type="password" id="s-key" class="api-key-input"
+            value="${ea(c.apiKey||'')}"
+            placeholder="${provider==='gemini'?'AIza...':'sk-ant-api03-...'}">
+        </div>
+
+        <div id="s-note" class="settings-note">
+          ${provider==='gemini'
+            ? '⚠️ APIキーは <strong>aistudio.google.com</strong> → 「Get API key」から無料で取得できます。<br>Gemini 2.0 Flash は個人利用ほぼ無制限・無料です。'
+            : '⚠️ APIキーは <strong>console.anthropic.com</strong> から取得できます（有料）。'}
+          <br>APIキーはブラウザ内のみに保存され、外部サーバーには送られません。
+        </div>
+        ${c.apiKey ? `<div style="margin-top:10px;font-size:12px;color:var(--success)">✅ APIキーが設定されています</div>` : ''}
+      </div>
+      <div class="modal-ft">
+        ${c.apiKey ? `<button class="btn btn-danger btn-sm" onclick="clearApiKey()">APIキーを削除</button>` : ''}
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="onSaveCfg()">保存する</button>
+      </div>
+    </div>`);
+}
+
+function switchProvider(p) {
+  // Update radio UI
+  ['gemini','claude'].forEach(id => {
+    const lbl = document.getElementById('lbl-'+id);
+    if (lbl) lbl.style.borderColor = id===p ? 'var(--accent)' : 'var(--border)';
+    const radio = lbl?.querySelector('input[type=radio]');
+    if (radio) radio.checked = id===p;
+  });
+  // Update model list
+  const sel   = document.getElementById('s-model');
+  const note  = document.getElementById('s-note');
+  const input = document.getElementById('s-key');
+  if (sel)   sel.innerHTML   = providerModelOpts(p, MODELS[p][0].v);
+  if (input) input.placeholder = p==='gemini' ? 'AIza...' : 'sk-ant-api03-...';
+  if (note)  note.innerHTML  = p==='gemini'
+    ? '⚠️ APIキーは <strong>aistudio.google.com</strong> → 「Get API key」から無料で取得できます。<br>Gemini 2.0 Flash は個人利用ほぼ無制限・無料です。<br>APIキーはブラウザ内のみに保存されます。'
+    : '⚠️ APIキーは <strong>console.anthropic.com</strong> から取得できます（有料）。<br>APIキーはブラウザ内のみに保存されます。';
+}
+
+function onSaveCfg() {
+  const provider = document.querySelector('[name=s-provider]:checked')?.value || 'gemini';
+  const key      = document.getElementById('s-key').value.trim();
+  const model    = document.getElementById('s-model').value;
+  saveCfg({ provider, apiKey: key, model });
+  closeModal();
+  toast('設定を保存しました', 'ok');
+}
+function clearApiKey() {
+  if (!confirm('APIキーを削除しますか？')) return;
+  saveCfg({ ...getCfg(), apiKey: '' });
+  closeModal();
+  toast('APIキーを削除しました');
+}
+
+/* ══════════════════════════════════════════════
+   PDF → Base64 image  (for AI input)
+══════════════════════════════════════════════ */
+async function pdfToImage(arrayBuffer) {
+  if (typeof pdfjsLib === 'undefined') return null;
+  const pdf  = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+  const page = await pdf.getPage(1);
+  const vp0  = page.getViewport({ scale: 1 });
+  const scale = Math.min(2.5, 1400 / vp0.width);
+  const vp   = page.getViewport({ scale });
+  const cv   = document.createElement('canvas');
+  cv.width   = vp.width; cv.height = vp.height;
+  await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+  return cv.toDataURL('image/jpeg', 0.85).split(',')[1];
+}
+
+/* ══════════════════════════════════════════════
+   PDF text extraction  (supplement for AI)
+══════════════════════════════════════════════ */
+async function pdfToText(arrayBuffer) {
+  if (typeof pdfjsLib === 'undefined') return '';
+  try {
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+    let text = '';
+    for (let i = 1; i <= Math.min(pdf.numPages, 2); i++) {
+      const page    = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(x => x.str).join(' ') + '\n';
+    }
+    return text.trim();
+  } catch(_) { return ''; }
+}
+
+/* ══════════════════════════════════════════════
+   AI Extraction  (calls Claude API)
+══════════════════════════════════════════════ */
+async function aiExtract(arrayBuffer) {
+  const { apiKey, model, provider } = getCfg();
+  if (!apiKey) throw new Error('NO_KEY');
+
+  // ArrayBufferをコピーして渡す（Worker転送後に detach されるため）
+  const imgB64     = await pdfToImage(arrayBuffer.slice(0));
+  const textContent = await pdfToText(arrayBuffer.slice(0));
+
+  const PROMPT = `この不動産の販売図面（物件資料）から情報を抽出してください。
+${textContent ? `\n【PDF抽出テキスト（参考）】\n${textContent.slice(0, 2500)}\n` : ''}
+必ず以下のJSON形式のみで返答してください。説明文・コードブロック（\`\`\`）・改行・前置きは一切不要です。JSONオブジェクトのみ出力してください:
+{
+  "name": "物件名または号室名（例：○○マンション 101号室）",
+  "type": "種別（マンション/一戸建て/土地/店舗/その他 のいずれか）",
+  "location": "所在地（都道府県から）",
+  "price": 価格（万円の整数。例3500。不明ならnull）,
+  "layout": "間取り（例：2LDK。なければnull）",
+  "landArea": 土地面積（㎡の数値。なければnull）,
+  "buildArea": 建物面積・床面積（㎡の数値。なければnull）,
+  "age": 築年数（整数。例10。新築なら0。不明ならnull）,
+  "structure": "構造（鉄筋コンクリート/鉄骨造/木造/その他 のいずれか。なければnull）",
+  "extra": "その他特記事項（向き・階数・駅徒歩等を簡潔に。なければnull）",
+  "cityPlan": "都市計画（市街化区域等。なければnull）",
+  "useZone": "用途地域（第一種低層住居専用地域等。なければnull）",
+  "coverageRatio": 建ぺい率（%の整数。例60。なければnull）,
+  "floorRatio": 容積率（%の整数。例200。なければnull）,
+  "road": "接道状況（なければnull）",
+  "setback": "セットバック（あり/なし。なければnull）",
+  "sellerName": "売主業者名（なければnull）",
+  "brokerName": "媒介業者名（売主と同じ場合はnull）",
+  "contactName": "担当者名（なければnull）",
+  "contactPhone": "担当者電話番号（なければnull）"
+}`;
+
+  let txt = '';
+
+  if (provider === 'claude') {
+    /* ── Anthropic Claude ── */
+    const content = [];
+    if (imgB64) {
+      content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imgB64 } });
+    }
+    content.push({ type: 'text', text: PROMPT });
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: model || 'claude-3-5-haiku-20241022',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Claudeエラー ${res.status}`);
+    }
+
+    const data = await res.json();
+    txt = data.content?.[0]?.text || '';
+
+  } else {
+    /* ── Google Gemini（動的モデル取得 + 自動フォールバック）── */
+    const parts = [];
+    if (imgB64) {
+      parts.push({ inline_data: { mime_type: 'image/jpeg', data: imgB64 } });
+    }
+    parts.push({ text: PROMPT });
+
+    // 実際に使えるモデルをAPIから取得し、それを優先する
+    const availableModels = await fetchAvailableGeminiModels(apiKey);
+    const preferred = model || 'gemini-2.0-flash-lite';
+    let tryCandidates;
+    if (availableModels && availableModels.length > 0) {
+      // 取得成功：利用可能モデルを優先、念のため固定リストも末尾に追加
+      tryCandidates = [
+        ...availableModels,
+        ...GEMINI_FALLBACKS.filter(m => !availableModels.includes(m))
+      ];
+      // 設定で選んだモデルが利用可能なら先頭に
+      if (availableModels.includes(preferred)) {
+        tryCandidates = [preferred, ...tryCandidates.filter(m => m !== preferred)];
+      }
+    } else {
+      // 取得失敗：固定リストで試す
+      tryCandidates = [preferred, ...GEMINI_FALLBACKS.filter(m => m !== preferred)];
+    }
+    let lastErr = null;
+
+    for (const tryModel of tryCandidates) {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${tryModel}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 1536, responseMimeType: 'application/json' }
+          })
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        txt = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        break; // success
+      }
+
+      const err = await res.json().catch(() => ({}));
+      const msg = err.error?.message || '';
+      // If model is unavailable, try next; otherwise throw immediately
+      if (msg.includes('no longer available') || msg.includes('not found') ||
+          msg.includes('not supported') || res.status === 404 || res.status === 400 && msg.includes('model')) {
+        lastErr = new Error(`モデル ${tryModel} が利用不可`);
+        continue;
+      }
+      throw new Error(msg || `Geminiエラー ${res.status}`);
+    }
+
+    if (!txt && lastErr) {
+      throw new Error(
+        '利用可能なGeminiモデルが見つかりませんでした。\n' +
+        'AI自動入力設定でAnthropicClaudeに切り替えるか、' +
+        'Google AI Studioで請求設定が完了しているか確認してください。'
+      );
+    }
+  }
+
+  // ① マークダウンのコードブロックを除去
+  const cleaned = txt
+    .replace(/```(?:json)?\s*/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  // ② JSON オブジェクトを探す
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (match) {
+    try {
+      return JSON.parse(match[0]);
+    } catch(_) {
+      // trailing comma 等を除去して再試行
+      try {
+        return JSON.parse(match[0].replace(/,\s*([}\]])/g, '$1'));
+      } catch(_2) { /* fall through to list parser */ }
+    }
+  }
+
+  // ③ フォールバック：番号付きリスト形式を解析
+  //    例： 17. `sellerName`: null  /  18. `brokerName`: "株式会社XX"
+  const KEYS = ['name','type','location','price','layout','landArea','buildArea',
+    'age','structure','extra','sellerName','brokerName','contactName','contactPhone',
+    'cityPlan','useZone','coverageRatio','floorRatio','road','setback'];
+
+  const obj = {};
+  for (const key of KEYS) {
+    // バッククォートあり・なし両方、値はnull/文字列/数値
+    const re = new RegExp(`\`?${key}\`?[：:：]\\s*(\`([^"\`\n]*)\`|"([^"\n]*)"|null|(\\d+\\.?\\d*))`, 'i');
+    const m2 = cleaned.match(re);
+    if (!m2) continue;
+    const raw = m2[2] ?? m2[3] ?? m2[4];
+    if (raw == null) { obj[key] = null; continue; }
+    const num = Number(raw);
+    obj[key] = (raw !== '' && !isNaN(num)) ? num : raw;
+  }
+
+  if (Object.keys(obj).length > 0) return obj;
+
+  // ④ 全て失敗した場合のエラー
+  const preview = txt.slice(0, 150).replace(/\n/g, ' ');
+  throw new Error(`AI応答からJSONを取得できませんでした。応答内容：${preview}`);
+}
+
+/* ══════════════════════════════════════════════
+   Fill form with extracted info
+══════════════════════════════════════════════ */
+function fillFormFromInfo(info) {
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (!el || val == null || val === '') return;
+    el.value = val;
+    el.classList.add('ai-filled');
+  };
+
+  setVal('p-name',       info.name);
+  setVal('p-type',       info.type);
+  setVal('p-loc',        info.location);
+  setVal('p-price',      info.price);
+  setVal('p-layout',     info.layout);
+  setVal('p-land-area',  info.landArea);
+  setVal('p-build-area', info.buildArea);
+  setVal('p-age',        info.age);
+  setVal('p-struct',     info.structure);
+  setVal('p-extra',      info.extra);
+  setVal('p-city-plan',  info.cityPlan);
+  setVal('p-use-zone',   info.useZone);
+  setVal('p-coverage',   info.coverageRatio);
+  setVal('p-floor-ratio',info.floorRatio);
+  setVal('p-road',       info.road);
+  setVal('p-setback',    info.setback);
+  setVal('p-cname',      info.contactName);
+  setVal('p-cphone',     info.contactPhone);
+
+  // Agent matching helper
+  const newAgents = [];
+  const matchOrCreateAgent = (name, selectId) => {
+    if (!name) return;
+    const norm = n => n.replace(/[　\s]/g,'').toLowerCase();
+    let found = D.agents.find(a => norm(a.name) === norm(name));
+    if (!found) found = D.agents.find(a => a.name.includes(name) || name.includes(a.name));
+    if (found) {
+      const el = document.getElementById(selectId);
+      if (el) { el.value = found.id; el.classList.add('ai-filled'); }
+    } else {
+      // Auto-register as new agent
+      const ag = { id: uid(), name, ts: Date.now() };
+      D.agents.push(ag); newAgents.push(name);
+      save();
+      // Add to select and choose it
+      const el = document.getElementById(selectId);
+      if (el) {
+        const opt = document.createElement('option');
+        opt.value = ag.id; opt.textContent = name;
+        el.appendChild(opt);
+        el.value = ag.id;
+        el.classList.add('ai-filled');
+      }
+    }
+  };
+
+  matchOrCreateAgent(info.sellerName, 'p-seller');
+  matchOrCreateAgent(info.brokerName, 'p-broker');
+
+  if (newAgents.length) {
+    setTimeout(() => toast(`業者「${newAgents.join('」「')}」を自動登録しました`, 'ok'), 500);
+  }
+}
+
+/* ══════════════════════════════════════════════
+   PROPERTIES
+══════════════════════════════════════════════ */
+function renderProps() {
+  let list = D.properties.filter(p => {
+    if (q) {
+      const ag1 = D.agents.find(a=>a.id===p.sellerId), ag2 = D.agents.find(a=>a.id===p.brokerId);
+      const hay = `${p.name} ${p.location} ${p.notes} ${ag1?.name||''} ${ag2?.name||''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (pf.status  && p.status  !== pf.status)  return false;
+    if (pf.custId  && !p.custIds?.includes(pf.custId)) return false;
+    if (pf.agentId && p.sellerId!==pf.agentId && p.brokerId!==pf.agentId) return false;
+    if (pf.type    && p.type    !== pf.type)    return false;
+    return true;
+  }).sort((a,b)=>(b.ts||0)-(a.ts||0));
+
+  const STATUSES = ['検討中','申込中','成約','見送り','未提案'];
+  const TYPES    = ['マンション','一戸建て','土地','店舗','その他'];
+
+  let h = `
+    <div class="filter-bar">
+      <span style="font-size:11px;color:var(--text-muted)">絞り込み</span>
+      <select class="f-select" onchange="pf.status=this.value;renderProps()">
+        <option value="">全ステータス</option>
+        ${STATUSES.map(s=>`<option value="${s}" ${pf.status===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <select class="f-select" onchange="pf.type=this.value;renderProps()">
+        <option value="">全種別</option>
+        ${TYPES.map(t=>`<option value="${t}" ${pf.type===t?'selected':''}>${t}</option>`).join('')}
+      </select>
+      <select class="f-select" onchange="pf.custId=this.value;renderProps()">
+        <option value="">全顧客</option>
+        ${D.customers.map(c=>`<option value="${c.id}" ${pf.custId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}
+      </select>
+      <select class="f-select" onchange="pf.agentId=this.value;renderProps()">
+        <option value="">全業者</option>
+        ${D.agents.map(a=>`<option value="${a.id}" ${pf.agentId===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="pf={status:'',custId:'',agentId:'',type:''};renderProps()">クリア</button>
+      <div style="margin-left:auto" class="view-toggle">
+        <button class="${vmode==='grid'?'active':''}" onclick="vmode='grid';renderProps()" title="グリッド">⊞</button>
+        <button class="${vmode==='list'?'active':''}" onclick="vmode='list';renderProps()" title="リスト">☰</button>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px">${list.length}件</div>`;
+
+  if (!list.length) {
+    h += `<div class="empty">
+      <div class="empty-icon">🏠</div>
+      <div class="empty-title">物件が登録されていません</div>
+      <div class="empty-desc">「＋ 新規登録」から販売図面を添付して登録してください</div>
+    </div>`;
+  } else if (vmode === 'grid') {
+    h += `<div class="prop-grid" id="pgrid">`;
+    list.forEach(p => {
+      const s  = D.agents.find(a=>a.id===p.sellerId);
+      const b  = D.agents.find(a=>a.id===p.brokerId);
+      const cs = (p.custIds||[]).map(id=>D.customers.find(c=>c.id===id)?.name).filter(Boolean);
+      h += `
+        <div class="prop-card" onclick="showPropDetail('${p.id}')">
+          <div class="prop-card-hd">
+            <span class="name">${esc(p.name||'物件名未設定')}</span>
+            ${p.type?`<span class="badge badge-type" style="font-size:10px;flex-shrink:0">${esc(p.type)}</span>`:''}
+          </div>
+          <div class="prop-thumb" id="th-${p.id}">
+            <div class="no-pdf">📄<br>読込中…</div>
+          </div>
+          <div class="prop-body">
+            <div class="prop-location">📍 ${esc(p.location||'所在地未設定')}</div>
+            <div class="prop-price">${formatPrice(p.price)}</div>
+            <div class="prop-specs">
+              ${p.layout?`<span class="prop-spec-tag">${esc(p.layout)}</span>`:''}
+              ${(p.buildArea||p.area)?`<span class="prop-spec-tag">建${p.buildArea||p.area}㎡</span>`:''}
+              ${p.landArea?`<span class="prop-spec-tag">土${p.landArea}㎡</span>`:''}
+              ${p.age?`<span class="prop-spec-tag">築${p.age}年</span>`:''}
+              ${p.structure?`<span class="prop-spec-tag">${esc(p.structure)}</span>`:''}
+              ${p.coverageRatio?`<span class="prop-spec-tag">建ぺ${p.coverageRatio}%</span>`:''}
+              ${p.floorRatio?`<span class="prop-spec-tag">容${p.floorRatio}%</span>`:''}
+            </div>
+            ${cs.length?`<div class="prop-customers">👤 ${esc(cs.join('、'))}</div>`:''}
+          </div>
+          <div class="prop-card-ft">
+            <span class="badge badge-${p.status||'未提案'}">${p.status||'未提案'}</span>
+            ${b?`<span style="font-size:10px;color:var(--text-muted)">媒: ${esc(b.name)}</span>`:''}
+          </div>
+        </div>`;
+    });
+    h += '</div>';
+  } else {
+    h += `<div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>物件名</th><th>種別</th><th>所在地</th><th>価格</th><th>間取り/面積</th>
+        <th>売主業者</th><th>媒介業者</th><th>提案顧客</th><th>ステータス</th><th></th>
+      </tr></thead><tbody>`;
+    list.forEach(p => {
+      const s  = D.agents.find(a=>a.id===p.sellerId);
+      const b  = D.agents.find(a=>a.id===p.brokerId);
+      const cs = (p.custIds||[]).map(id=>D.customers.find(c=>c.id===id)?.name).filter(Boolean);
+      h += `<tr onclick="showPropDetail('${p.id}')">
+        <td><strong>${esc(p.name||'未設定')}</strong></td>
+        <td>${p.type?`<span class="badge badge-type">${esc(p.type)}</span>`:'-'}</td>
+        <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.location||'-')}</td>
+        <td style="white-space:nowrap"><strong>${formatPrice(p.price)}</strong></td>
+        <td>${esc(p.layout||'-')} ${(p.buildArea||p.area)?(p.buildArea||p.area)+'㎡':''}</td>
+        <td>${s?esc(s.name):'-'}</td>
+        <td>${b?esc(b.name):'-'}</td>
+        <td>${cs.slice(0,2).join('、')||'-'}${cs.length>2?`…+${cs.length-2}`:''}</td>
+        <td><span class="badge badge-${p.status||'未提案'}">${p.status||'未提案'}</span></td>
+        <td onclick="event.stopPropagation()">
+          <button class="btn btn-secondary btn-xs" onclick="showPropModal('${p.id}')">編集</button>
+        </td>
+      </tr>`;
+    });
+    h += `</tbody></table></div>`;
+  }
+
+  document.getElementById('cnt').innerHTML = h;
+  if (vmode === 'grid') list.forEach(p => loadThumb(p.id));
+}
+
+async function loadThumb(id) {
+  const el = document.getElementById(`th-${id}`);
+  if (!el) return;
+  const rec = await dbGet(id);
+  if (!rec) { el.innerHTML = '<div class="no-pdf">📄<br>図面なし</div>'; return; }
+  try {
+    const pdf  = await pdfjsLib.getDocument({ data: new Uint8Array(rec.data) }).promise;
+    const pg   = await pdf.getPage(1);
+    const vp   = pg.getViewport({ scale: .5 });
+    const cv   = document.createElement('canvas');
+    cv.width   = vp.width; cv.height = vp.height;
+    await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+    el.innerHTML = ''; el.style.background = '#fff'; el.appendChild(cv);
+  } catch(_) { el.innerHTML = '<div class="no-pdf">📄<br>PDF</div>'; }
+}
+
+/* ── Property Detail ── */
+async function showPropDetail(id) {
+  const p  = D.properties.find(x=>x.id===id); if (!p) return;
+  const s  = D.agents.find(a=>a.id===p.sellerId);
+  const b  = D.agents.find(a=>a.id===p.brokerId);
+  const cs = (p.custIds||[]).map(cid=>D.customers.find(c=>c.id===cid)).filter(Boolean);
+
+  showModal(`
+    <div class="modal modal-xl">
+      <div class="modal-hd">
+        <div>
+          <div class="modal-title">${esc(p.name||'物件詳細')}</div>
+          <div class="modal-subtitle">登録日: ${p.ts?new Date(p.ts).toLocaleDateString('ja-JP'):'-'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="badge badge-${p.status||'未提案'}" style="font-size:13px">${p.status||'未提案'}</span>
+          <button class="btn btn-secondary btn-sm" onclick="closeModal();showPropModal('${p.id}')">✏️ 編集</button>
+          <button class="btn btn-danger btn-sm" onclick="delProp('${p.id}')">🗑</button>
+          <span class="modal-close" onclick="closeModal()">✕</span>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="detail-cols">
+          <div>
+            <div class="detail-sec">
+              <div class="detail-sec-title">📋 基本情報</div>
+              <div class="info-grid">
+                <div class="info-cell"><div class="il">所在地</div><div class="iv">📍 ${esc(p.location||'-')}</div></div>
+                <div class="info-cell"><div class="il">販売価格</div><div class="iv" style="color:var(--primary);font-weight:800">${formatPrice(p.price)}</div></div>
+                <div class="info-cell"><div class="il">種別</div><div class="iv">${esc(p.type||'-')}</div></div>
+                <div class="info-cell"><div class="il">間取り</div><div class="iv">${esc(p.layout||'-')}</div></div>
+                <div class="info-cell"><div class="il">建物面積</div><div class="iv">${(p.buildArea||p.area)?(p.buildArea||p.area)+'㎡':'-'}</div></div>
+                <div class="info-cell"><div class="il">土地面積</div><div class="iv">${p.landArea?p.landArea+'㎡':'-'}</div></div>
+                <div class="info-cell"><div class="il">築年数</div><div class="iv">${p.age!=null&&p.age!==''?'築'+p.age+'年':'-'}</div></div>
+                <div class="info-cell"><div class="il">構造</div><div class="iv">${esc(p.structure||'-')}</div></div>
+                <div class="info-cell"><div class="il">その他スペック</div><div class="iv">${esc(p.extra||'-')}</div></div>
+              </div>
+            </div>
+            ${(p.cityPlan||p.useZone||p.coverageRatio||p.floorRatio||p.road||p.setback)?`
+            <div class="detail-sec">
+              <div class="detail-sec-title">📐 法令・接道情報</div>
+              <div class="info-grid">
+                ${p.cityPlan?`<div class="info-cell"><div class="il">都市計画</div><div class="iv">${esc(p.cityPlan)}</div></div>`:''}
+                ${p.useZone?`<div class="info-cell"><div class="il">用途地域</div><div class="iv">${esc(p.useZone)}</div></div>`:''}
+                ${p.coverageRatio?`<div class="info-cell"><div class="il">建ぺい率</div><div class="iv">${p.coverageRatio}%</div></div>`:''}
+                ${p.floorRatio?`<div class="info-cell"><div class="il">容積率</div><div class="iv">${p.floorRatio}%</div></div>`:''}
+                ${p.road?`<div class="info-cell" style="grid-column:1/-1"><div class="il">接道状況</div><div class="iv">${esc(p.road)}</div></div>`:''}
+                ${p.setback?`<div class="info-cell"><div class="il">セットバック</div><div class="iv">${esc(p.setback)}</div></div>`:''}
+              </div>
+            </div>`:''}
+            <div class="detail-sec">
+              <div class="detail-sec-title">🏪 業者情報</div>
+              <div class="info-grid">
+                <div class="info-cell">
+                  <div class="il">売主業者</div>
+                  <div class="iv">${s?esc(s.name):'-'}</div>
+                  ${s?.phone?`<div style="font-size:10px;color:var(--text-muted)">📞 ${esc(s.phone)}</div>`:''}
+                </div>
+                <div class="info-cell">
+                  <div class="il">媒介業者</div>
+                  <div class="iv">${b?esc(b.name):'-'}</div>
+                  ${b?.phone?`<div style="font-size:10px;color:var(--text-muted)">📞 ${esc(b.phone)}</div>`:''}
+                </div>
+                ${p.contactName?`<div class="info-cell"><div class="il">担当者名</div><div class="iv">${esc(p.contactName)}</div></div>`:''}
+                ${p.contactPhone?`<div class="info-cell"><div class="il">担当者電話</div><div class="iv">📞 ${esc(p.contactPhone)}</div></div>`:''}
+              </div>
+            </div>
+            <div class="detail-sec">
+              <div class="detail-sec-title">👥 提案顧客</div>
+              ${cs.length
+                ? `<div class="chip-row">
+                    ${cs.map(c=>`<span class="chip" onclick="closeModal();filterByCust('${c.id}')">👤 ${esc(c.name)}</span>`).join('')}
+                  </div>
+                  <div style="margin-top:6px;font-size:10px;color:var(--text-muted)">クリックで同顧客の提案物件一覧へ</div>`
+                : '<div style="font-size:12px;color:var(--text-muted)">紐付けられた顧客はいません</div>'
+              }
+            </div>
+            ${p.notes?`<div class="detail-sec">
+              <div class="detail-sec-title">📝 メモ</div>
+              <div style="font-size:12px;line-height:1.7;white-space:pre-wrap;background:var(--bg);padding:10px;border-radius:6px">${esc(p.notes)}</div>
+            </div>`:''}
+          </div>
+          <div>
+            <div class="detail-sec-title" style="margin-bottom:8px">📄 販売図面</div>
+            <div class="pdf-viewer" id="pv-detail"><div class="pdf-no">読込中…</div></div>
+          </div>
+        </div>
+      </div>
+    </div>`);
+
+  const rec = await dbGet(id);
+  const pv  = document.getElementById('pv-detail');
+  if (!pv) return;
+  if (rec && typeof pdfjsLib !== 'undefined') {
+    try {
+      _pdf = { doc: await pdfjsLib.getDocument({ data: new Uint8Array(rec.data) }).promise, page: 1 };
+      pv.innerHTML = `
+        <div class="pdf-tb">
+          <button onclick="pdfNav(-1)">◀</button>
+          <span class="pinfo" id="pinfo">1 / ${_pdf.doc.numPages}</span>
+          <button onclick="pdfNav(1)">▶</button>
+          <span style="flex:1"></span>
+          <span style="color:rgba(255,255,255,.4);font-size:10px">${esc(rec.fileName)}</span>
+        </div>
+        <div class="pdf-canvas-wrap" id="pcw"></div>`;
+      await renderPDFPage();
+    } catch(_) { pv.innerHTML = '<div class="pdf-no">PDF表示に失敗しました</div>'; }
+  } else if (rec) {
+    pv.innerHTML = `<div class="pdf-no">📄 ${esc(rec.fileName)}</div>`;
+  } else {
+    pv.innerHTML = '<div class="pdf-no">販売図面が添付されていません</div>';
+  }
+}
+
+async function renderPDFPage() {
+  if (!_pdf) return;
+  const wrap = document.getElementById('pcw'); if (!wrap) return;
+  const page = await _pdf.doc.getPage(_pdf.page);
+  const w    = (wrap.clientWidth || 260) - 24;
+  const vp0  = page.getViewport({ scale: 1 });
+  const sc   = Math.min(w / vp0.width, 2.5);
+  const vp   = page.getViewport({ scale: sc });
+  const cv   = document.createElement('canvas');
+  cv.width   = vp.width; cv.height = vp.height;
+  await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+  wrap.innerHTML = ''; wrap.appendChild(cv);
+  const pi = document.getElementById('pinfo');
+  if (pi) pi.textContent = `${_pdf.page} / ${_pdf.doc.numPages}`;
+}
+async function pdfNav(d) {
+  if (!_pdf) return;
+  _pdf.page = Math.max(1, Math.min(_pdf.doc.numPages, _pdf.page + d));
+  await renderPDFPage();
+}
+async function delProp(id) {
+  if (!confirm('この物件を削除しますか？')) return;
+  D.properties = D.properties.filter(p => p.id !== id);
+  await dbDel(id);
+  save(); closeModal(); toast('物件を削除しました', 'ok'); renderProps();
+}
+
+/* ── Property Form ── */
+function showPropModal(editId = '') {
+  _pendingFile = null;
+  const p = editId ? D.properties.find(x => x.id === editId) : null;
+  const STATUSES   = ['未提案','検討中','申込中','成約','見送り'];
+  const TYPES      = ['マンション','一戸建て','土地','店舗','その他'];
+  const STRUCTURES = ['鉄筋コンクリート','鉄骨造','木造','その他'];
+  const cfg        = getCfg();
+
+  const agOpts = (key) => D.agents.map(a =>
+    `<option value="${a.id}" ${p?.[key]===a.id?'selected':''}>${esc(a.name)}</option>`
+  ).join('');
+
+  const custCbs = D.customers.map(c => `
+    <label class="cust-select-item">
+      <input type="checkbox" name="cids" value="${c.id}" ${p?.custIds?.includes(c.id)?'checked':''}>
+      <span>${esc(c.name)}</span>
+      ${c.phone?`<span style="font-size:10px;color:var(--text-muted)">${esc(c.phone)}</span>`:''}
+    </label>`).join('');
+
+  // AI status hint bar
+  const aiHint = cfg.apiKey
+    ? `<div class="ai-hint-bar">
+        <span>✨</span>
+        <span>AIが自動入力対応中 — 販売図面をアップロードすると物件情報を自動で入力します。</span>
+        <span class="ai-badge">ON</span>
+      </div>`
+    : `<div class="ai-hint-bar warn">
+        <span>💡</span>
+        <span>AIキーを設定すると、PDFから物件情報を自動抽出できます。</span>
+        <button class="btn btn-secondary btn-xs" onclick="closeModal();showSettings()" style="flex-shrink:0">設定する</button>
+      </div>`;
+
+  showModal(`
+    <div class="modal modal-xl">
+      <div class="modal-hd">
+        <div class="modal-title">${p ? '物件を編集' : '新規物件登録'}</div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        ${aiHint}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div>
+            <!-- PDF -->
+            <div class="form-sec">
+              <div class="form-sec-title">📄 販売図面 (PDF)</div>
+              <div id="pdf-drop" class="pdf-drop"
+                onclick="document.getElementById('pfi').click()"
+                ondragover="event.preventDefault();this.classList.add('over')"
+                ondragleave="this.classList.remove('over')"
+                ondrop="onDrop(event)">
+                <div id="pdf-disp">
+                  <div class="pdf-drop-icon">📁</div>
+                  <div class="pdf-drop-text">クリックまたはドラッグ＆ドロップ</div>
+                  <div class="pdf-drop-sub">PDF形式のみ対応 ${cfg.apiKey ? '• アップロード後にAI自動入力が始まります' : ''}</div>
+                </div>
+              </div>
+              <input type="file" id="pfi" accept=".pdf" style="display:none" onchange="onFileSelect(event)">
+            </div>
+
+            <!-- Basic info -->
+            <div class="form-sec">
+              <div class="form-sec-title">📋 基本情報</div>
+              <div class="form-group">
+                <label>物件名 <span class="req">*</span></label>
+                <input type="text" id="p-name" value="${ea(p?.name||'')}" placeholder="例：○○マンション 101号室">
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>種別</label>
+                  <select id="p-type">
+                    <option value="">選択</option>
+                    ${TYPES.map(t=>`<option value="${t}" ${p?.type===t?'selected':''}>${t}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>ステータス</label>
+                  <select id="p-status">
+                    ${STATUSES.map(s=>`<option value="${s}" ${(p?.status||'未提案')===s?'selected':''}>${s}</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>所在地</label>
+                <input type="text" id="p-loc" value="${ea(p?.location||'')}" placeholder="例：東京都渋谷区○○1-2-3">
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>販売価格（万円）</label>
+                  <input type="number" id="p-price" value="${p?.price||''}" placeholder="例：3500">
+                </div>
+                <div class="form-group">
+                  <label>間取り</label>
+                  <input type="text" id="p-layout" value="${ea(p?.layout||'')}" placeholder="例：2LDK">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>土地面積（㎡）</label>
+                  <input type="number" id="p-land-area" value="${p?.landArea||''}" placeholder="例：120.5">
+                </div>
+                <div class="form-group">
+                  <label>建物面積（㎡）</label>
+                  <input type="number" id="p-build-area" value="${p?.buildArea||p?.area||''}" placeholder="例：85.3">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>築年数（年）</label>
+                  <input type="number" id="p-age" value="${p?.age||''}" placeholder="例：10">
+                </div>
+                <div class="form-group">
+                  <label>構造</label>
+                  <select id="p-struct">
+                    <option value="">選択</option>
+                    ${STRUCTURES.map(s=>`<option value="${s}" ${p?.structure===s?'selected':''}>${s}</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group" style="grid-column:1/-1">
+                  <label>その他スペック</label>
+                  <input type="text" id="p-extra" value="${ea(p?.extra||'')}" placeholder="例：南向き・角部屋・14階">
+                </div>
+              </div>
+              <!-- 法令・接道情報 -->
+              <div class="form-sec" style="margin-top:14px">
+                <div class="form-sec-title">📐 法令・接道情報</div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>都市計画</label>
+                    <select id="p-city-plan">
+                      <option value="">選択</option>
+                      <option ${p?.cityPlan==='市街化区域'?'selected':''}>市街化区域</option>
+                      <option ${p?.cityPlan==='市街化調整区域'?'selected':''}>市街化調整区域</option>
+                      <option ${p?.cityPlan==='非線引区域'?'selected':''}>非線引区域</option>
+                      <option ${p?.cityPlan==='準都市計画区域'?'selected':''}>準都市計画区域</option>
+                      <option ${p?.cityPlan==='都市計画区域外'?'selected':''}>都市計画区域外</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>用途地域</label>
+                    <select id="p-use-zone">
+                      <option value="">選択</option>
+                      <option ${p?.useZone==='第一種低層住居専用地域'?'selected':''}>第一種低層住居専用地域</option>
+                      <option ${p?.useZone==='第二種低層住居専用地域'?'selected':''}>第二種低層住居専用地域</option>
+                      <option ${p?.useZone==='第一種中高層住居専用地域'?'selected':''}>第一種中高層住居専用地域</option>
+                      <option ${p?.useZone==='第二種中高層住居専用地域'?'selected':''}>第二種中高層住居専用地域</option>
+                      <option ${p?.useZone==='第一種住居地域'?'selected':''}>第一種住居地域</option>
+                      <option ${p?.useZone==='第二種住居地域'?'selected':''}>第二種住居地域</option>
+                      <option ${p?.useZone==='準住居地域'?'selected':''}>準住居地域</option>
+                      <option ${p?.useZone==='近隣商業地域'?'selected':''}>近隣商業地域</option>
+                      <option ${p?.useZone==='商業地域'?'selected':''}>商業地域</option>
+                      <option ${p?.useZone==='準工業地域'?'selected':''}>準工業地域</option>
+                      <option ${p?.useZone==='工業地域'?'selected':''}>工業地域</option>
+                      <option ${p?.useZone==='工業専用地域'?'selected':''}>工業専用地域</option>
+                      <option ${p?.useZone==='その他'?'selected':''}>その他</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>建ぺい率（%）</label>
+                    <input type="number" id="p-coverage" value="${p?.coverageRatio||''}" placeholder="例：60">
+                  </div>
+                  <div class="form-group">
+                    <label>容積率（%）</label>
+                    <input type="number" id="p-floor-ratio" value="${p?.floorRatio||''}" placeholder="例：200">
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>接道状況</label>
+                    <input type="text" id="p-road" value="${ea(p?.road||'')}" placeholder="例：北側4m公道に6m接道">
+                  </div>
+                  <div class="form-group">
+                    <label>セットバック</label>
+                    <select id="p-setback">
+                      <option value="">未確認</option>
+                      <option ${p?.setback==='あり'?'selected':''}>あり</option>
+                      <option ${p?.setback==='なし'?'selected':''}>なし</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <!-- Agents -->
+            <div class="form-sec">
+              <div class="form-sec-title">🏪 業者情報</div>
+              <div class="form-group">
+                <label>売主業者</label>
+                <select id="p-seller">
+                  <option value="">選択してください</option>
+                  ${agOpts('sellerId')}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>媒介業者</label>
+                <select id="p-broker">
+                  <option value="">選択してください</option>
+                  ${agOpts('brokerId')}
+                </select>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>担当者名</label>
+                  <input type="text" id="p-cname" value="${ea(p?.contactName||'')}" placeholder="担当者名">
+                </div>
+                <div class="form-group">
+                  <label>担当者電話</label>
+                  <input type="tel" id="p-cphone" value="${ea(p?.contactPhone||'')}" placeholder="000-0000-0000">
+                </div>
+              </div>
+            </div>
+
+            <!-- Customers -->
+            <div class="form-sec">
+              <div class="form-sec-title">👥 提案顧客（複数選択可）</div>
+              ${D.customers.length
+                ? `<div class="cust-select-list">${custCbs}</div>`
+                : `<div style="font-size:11px;color:var(--text-muted)">顧客が未登録です。先に顧客管理から登録してください。</div>`}
+            </div>
+
+            <!-- Notes -->
+            <div class="form-sec">
+              <div class="form-sec-title">📝 メモ</div>
+              <div class="form-group">
+                <textarea id="p-notes" placeholder="特記事項・所感など…">${esc(p?.notes||'')}</textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-ft">
+        ${p ? `<button class="btn btn-danger" onclick="delProp('${p.id}')">削除</button>` : ''}
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="saveProp('${editId}')">
+          ${p ? '更新する' : '登録する'}
+        </button>
+      </div>
+    </div>`);
+
+  if (p) showExistingPDFBadge(p.id);
+}
+
+async function showExistingPDFBadge(id) {
+  const rec = await dbGet(id);
+  if (rec) {
+    const d = document.getElementById('pdf-disp');
+    if (d) d.innerHTML = `
+      <div class="pdf-ready">
+        <span style="font-size:24px">📄</span>
+        <span class="pname">${esc(rec.fileName)}</span>
+        <span style="font-size:10px;color:var(--success);flex-shrink:0">登録済み</span>
+      </div>`;
+  }
+}
+
+function onFileSelect(e) { const f = e.target.files[0]; if (f) setPending(f); }
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('pdf-drop')?.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type === 'application/pdf') setPending(f);
+  else toast('PDFファイルを選択してください', 'err');
+}
+
+/* ══ Main entry: file selected → maybe AI extract ══ */
+async function setPending(f) {
+  _pendingFile = f;
+  const { apiKey } = getCfg();
+  const d = document.getElementById('pdf-disp');
+
+  if (apiKey) {
+    // Show extracting spinner
+    if (d) d.innerHTML = `
+      <div class="extracting-inner">
+        <div class="ext-spin spin">⏳</div>
+        <div class="ext-label">✨ AIが販売図面を読み取っています…</div>
+        <div class="ext-fname">${esc(f.name)}</div>
+      </div>`;
+
+    try {
+      const buffer = await f.arrayBuffer();
+      const info   = await aiExtract(buffer);
+      fillFormFromInfo(info);
+      toast('✨ AIが情報を自動入力しました。内容をご確認ください。', 'ok');
+      if (d) d.innerHTML = `
+        <div class="pdf-ready">
+          <span style="font-size:24px">📄</span>
+          <span class="pname">${esc(f.name)}</span>
+          <span class="ai-badge">✨ AI入力済み</span>
+        </div>`;
+    } catch(e) {
+      const isNoKey  = e.message === 'NO_KEY';
+      const errLabel = isNoKey ? 'APIキー未設定' : e.message;
+      console.error('AI extract error:', e);
+      toast(`自動入力に失敗しました（${errLabel}）`, 'err');
+      if (d) d.innerHTML = `
+        <div class="pdf-ready" style="background:#fff5f5;border-color:#feb2b2">
+          <span style="font-size:24px">📄</span>
+          <span class="pname">${esc(f.name)}</span>
+          <span style="font-size:10px;color:var(--danger);flex-shrink:0">自動入力失敗</span>
+        </div>`;
+    }
+  } else {
+    // No API key – just show file selected
+    if (d) d.innerHTML = `
+      <div class="pdf-ready">
+        <span style="font-size:24px">📄</span>
+        <span class="pname">${esc(f.name)}</span>
+        <span style="font-size:10px;color:var(--success);flex-shrink:0">✓ 選択済み</span>
+      </div>`;
+  }
+}
+
+async function saveProp(editId) {
+  const name = document.getElementById('p-name').value.trim();
+  if (!name) { toast('物件名を入力してください', 'err'); return; }
+  const custIds = [...document.querySelectorAll('[name=cids]:checked')].map(el => el.value);
+  const prop = {
+    id: editId || uid(), name,
+    type:         document.getElementById('p-type').value,
+    status:       document.getElementById('p-status').value,
+    location:     document.getElementById('p-loc').value.trim(),
+    price:        document.getElementById('p-price').value,
+    layout:       document.getElementById('p-layout').value.trim(),
+    landArea:      document.getElementById('p-land-area').value,
+    buildArea:     document.getElementById('p-build-area').value,
+    cityPlan:      document.getElementById('p-city-plan').value,
+    useZone:       document.getElementById('p-use-zone').value,
+    coverageRatio: document.getElementById('p-coverage').value,
+    floorRatio:    document.getElementById('p-floor-ratio').value,
+    road:          document.getElementById('p-road').value.trim(),
+    setback:       document.getElementById('p-setback').value,
+    age:           document.getElementById('p-age').value,
+    structure:    document.getElementById('p-struct').value,
+    extra:        document.getElementById('p-extra').value.trim(),
+    sellerId:     document.getElementById('p-seller').value,
+    brokerId:     document.getElementById('p-broker').value,
+    contactName:  document.getElementById('p-cname').value.trim(),
+    contactPhone: document.getElementById('p-cphone').value.trim(),
+    custIds, notes: document.getElementById('p-notes').value.trim(),
+    updAt: Date.now()
+  };
+  const ex = D.properties.find(p => p.id === prop.id);
+  if (ex) { prop.ts = ex.ts; Object.assign(ex, prop); }
+  else     { prop.ts = Date.now(); D.properties.push(prop); }
+
+  if (_pendingFile) {
+    await dbSave(prop.id, _pendingFile.name, await _pendingFile.arrayBuffer());
+  }
+  save(); closeModal();
+  toast(`物件を${editId ? '更新' : '登録'}しました`, 'ok');
+  renderProps();
+}
+
+/* ══════════════════════════════════════════════
+   CUSTOMERS
+══════════════════════════════════════════════ */
+function renderCusts() {
+  let list = D.customers.filter(c => {
+    if (!q) return true;
+    return `${c.name} ${c.phone} ${c.email} ${c.notes}`.toLowerCase().includes(q);
+  }).sort((a,b)=>(b.ts||0)-(a.ts||0));
+
+  let h = `<div class="tbl-wrap"><table>
+    <thead><tr>
+      <th>顧客名</th><th>電話番号</th><th>メール</th>
+      <th>提案件数</th><th>メモ</th><th>登録日</th><th></th>
+    </tr></thead><tbody>`;
+
+  if (!list.length) {
+    h += `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">顧客が登録されていません</td></tr>`;
+  }
+  list.forEach(c => {
+    const cnt = D.properties.filter(p => p.custIds?.includes(c.id)).length;
+    h += `<tr onclick="filterByCust('${c.id}')">
+      <td><strong>${esc(c.name)}</strong></td>
+      <td>${esc(c.phone||'-')}</td>
+      <td style="font-size:11px">${esc(c.email||'-')}</td>
+      <td><span style="background:var(--primary);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px">${cnt}件</span></td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--text-muted)">${esc(c.notes||'-')}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${c.ts?new Date(c.ts).toLocaleDateString('ja-JP'):'-'}</td>
+      <td onclick="event.stopPropagation()">
+        <button class="btn btn-secondary btn-xs" onclick="showCustModal('${c.id}')">編集</button>
+        <button class="btn btn-danger btn-xs" onclick="delCust('${c.id}')">削除</button>
+      </td>
+    </tr>`;
+  });
+  h += `</tbody></table></div>`;
+  document.getElementById('cnt').innerHTML = h;
+}
+function filterByCust(id) { pf.custId = id; nav('props'); }
+
+function showCustModal(editId = '') {
+  const c = editId ? D.customers.find(x => x.id === editId) : null;
+  showModal(`
+    <div class="modal">
+      <div class="modal-hd">
+        <div class="modal-title">${c ? '顧客を編集' : '顧客を登録'}</div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>顧客名 <span class="req">*</span></label>
+          <input type="text" id="c-name" value="${ea(c?.name||'')}" placeholder="例：田中 太郎">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>電話番号</label>
+            <input type="tel" id="c-phone" value="${ea(c?.phone||'')}" placeholder="000-0000-0000">
+          </div>
+          <div class="form-group">
+            <label>メールアドレス</label>
+            <input type="email" id="c-email" value="${ea(c?.email||'')}" placeholder="example@email.com">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>ご要望・条件・備考</label>
+          <textarea id="c-notes" placeholder="希望エリア、予算、間取り条件、備考など…">${esc(c?.notes||'')}</textarea>
+        </div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="saveCust('${editId}')">
+          ${c ? '更新する' : '登録する'}
+        </button>
+      </div>
+    </div>`);
+}
+function saveCust(editId) {
+  const name = document.getElementById('c-name').value.trim();
+  if (!name) { toast('顧客名を入力してください', 'err'); return; }
+  const cust = {
+    id: editId || uid(), name,
+    phone: document.getElementById('c-phone').value.trim(),
+    email: document.getElementById('c-email').value.trim(),
+    notes: document.getElementById('c-notes').value.trim()
+  };
+  const ex = D.customers.find(c => c.id === cust.id);
+  if (ex) { cust.ts = ex.ts; Object.assign(ex, cust); }
+  else     { cust.ts = Date.now(); D.customers.push(cust); }
+  save(); closeModal(); toast(`顧客を${editId ? '更新' : '登録'}しました`, 'ok'); renderCusts();
+}
+function delCust(id) {
+  if (!confirm('この顧客を削除しますか？\n物件との紐付けも解除されます。')) return;
+  D.customers = D.customers.filter(c => c.id !== id);
+  D.properties.forEach(p => { p.custIds = (p.custIds||[]).filter(x => x !== id); });
+  save(); toast('顧客を削除しました', 'ok'); renderCusts();
+}
+
+/* ══════════════════════════════════════════════
+   AGENTS
+══════════════════════════════════════════════ */
+function renderAgents() {
+  let list = D.agents.filter(a => {
+    if (!q) return true;
+    return `${a.name} ${a.phone} ${a.email} ${a.contact}`.toLowerCase().includes(q);
+  }).sort((a,b)=>(b.ts||0)-(a.ts||0));
+
+  let h = `<div class="tbl-wrap"><table>
+    <thead><tr>
+      <th>業者名</th><th>種別</th><th>電話番号</th>
+      <th>担当者名</th><th>メール</th><th>売主物件</th><th>媒介物件</th><th></th>
+    </tr></thead><tbody>`;
+
+  if (!list.length) {
+    h += `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">業者が登録されていません</td></tr>`;
+  }
+  list.forEach(a => {
+    const sc = D.properties.filter(p => p.sellerId === a.id).length;
+    const bc = D.properties.filter(p => p.brokerId === a.id).length;
+    h += `<tr onclick="filterByAgent('${a.id}')">
+      <td><strong>${esc(a.name)}</strong></td>
+      <td>${a.type?`<span class="badge badge-type">${esc(a.type)}</span>`:'-'}</td>
+      <td>${esc(a.phone||'-')}</td>
+      <td>${esc(a.contact||'-')}</td>
+      <td style="font-size:11px">${esc(a.email||'-')}</td>
+      <td>${sc>0?`<span style="background:var(--primary);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px">${sc}件</span>`:'-'}</td>
+      <td>${bc>0?`<span style="background:#6b46c1;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px">${bc}件</span>`:'-'}</td>
+      <td onclick="event.stopPropagation()">
+        <button class="btn btn-secondary btn-xs" onclick="showAgentModal('${a.id}')">編集</button>
+        <button class="btn btn-danger btn-xs" onclick="delAgent('${a.id}')">削除</button>
+      </td>
+    </tr>`;
+  });
+  h += `</tbody></table></div>`;
+  document.getElementById('cnt').innerHTML = h;
+}
+function filterByAgent(id) { pf.agentId = id; nav('props'); }
+
+function showAgentModal(editId = '') {
+  const a = editId ? D.agents.find(x => x.id === editId) : null;
+  const TYPES = ['売主業者','媒介業者','両方'];
+  showModal(`
+    <div class="modal">
+      <div class="modal-hd">
+        <div class="modal-title">${a ? '業者を編集' : '業者を登録'}</div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>業者名 <span class="req">*</span></label>
+          <input type="text" id="a-name" value="${ea(a?.name||'')}" placeholder="例：○○不動産株式会社">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>種別</label>
+            <select id="a-type">
+              <option value="">選択</option>
+              ${TYPES.map(t=>`<option value="${t}" ${a?.type===t?'selected':''}>${t}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>電話番号</label>
+            <input type="tel" id="a-phone" value="${ea(a?.phone||'')}" placeholder="000-0000-0000">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>担当者名</label>
+            <input type="text" id="a-contact" value="${ea(a?.contact||'')}" placeholder="担当者名">
+          </div>
+          <div class="form-group">
+            <label>メールアドレス</label>
+            <input type="email" id="a-email" value="${ea(a?.email||'')}" placeholder="example@co.jp">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>備考</label>
+          <textarea id="a-notes" placeholder="備考…">${esc(a?.notes||'')}</textarea>
+        </div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="saveAgent('${editId}')">
+          ${a ? '更新する' : '登録する'}
+        </button>
+      </div>
+    </div>`);
+}
+function saveAgent(editId) {
+  const name = document.getElementById('a-name').value.trim();
+  if (!name) { toast('業者名を入力してください', 'err'); return; }
+  const agent = {
+    id: editId || uid(), name,
+    type:    document.getElementById('a-type').value,
+    phone:   document.getElementById('a-phone').value.trim(),
+    contact: document.getElementById('a-contact').value.trim(),
+    email:   document.getElementById('a-email').value.trim(),
+    notes:   document.getElementById('a-notes').value.trim()
+  };
+  const ex = D.agents.find(a => a.id === agent.id);
+  if (ex) { agent.ts = ex.ts; Object.assign(ex, agent); }
+  else     { agent.ts = Date.now(); D.agents.push(agent); }
+  save(); closeModal(); toast(`業者を${editId ? '更新' : '登録'}しました`, 'ok'); renderAgents();
+}
+function delAgent(id) {
+  if (!confirm('この業者を削除しますか？\n物件との紐付けも解除されます。')) return;
+  D.agents = D.agents.filter(a => a.id !== id);
+  D.properties.forEach(p => {
+    if (p.sellerId === id) p.sellerId = '';
+    if (p.brokerId === id) p.brokerId = '';
+  });
+  save(); toast('業者を削除しました', 'ok'); renderAgents();
+}
+
+/* ══════════════════════════════════════════════
+   DASHBOARD
+══════════════════════════════════════════════ */
+function renderDash() {
+  const P   = D.properties;
+  const cnt = s => P.filter(p => (p.status||'未提案') === s).length;
+  const STATUSES = ['未提案','検討中','申込中','成約','見送り'];
+
+  const cpMap = {};
+  P.forEach(p => (p.custIds||[]).forEach(id => { cpMap[id] = (cpMap[id]||0)+1; }));
+  const topCusts = Object.entries(cpMap).sort(([,a],[,b])=>b-a).slice(0,5);
+
+  const apMap = {};
+  P.forEach(p => {
+    if (p.sellerId) apMap[p.sellerId] = (apMap[p.sellerId]||0)+1;
+    if (p.brokerId && p.brokerId !== p.sellerId) apMap[p.brokerId] = (apMap[p.brokerId]||0)+1;
+  });
+  const topAgents = Object.entries(apMap).sort(([,a],[,b])=>b-a).slice(0,5);
+  const recent    = [...P].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,6);
+
+  document.getElementById('cnt').innerHTML = `
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">総物件数</div>
+        <div class="stat-value" style="color:var(--primary)">${P.length}</div>
+        <div class="stat-sub">件登録済み</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">検討中</div>
+        <div class="stat-value" style="color:#2b6cb0">${cnt('検討中')}</div>
+        <div class="stat-sub">件</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">申込中</div>
+        <div class="stat-value" style="color:#c05621">${cnt('申込中')}</div>
+        <div class="stat-sub">件</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">成約済み</div>
+        <div class="stat-value" style="color:var(--success)">${cnt('成約')}</div>
+        <div class="stat-sub">件</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="card">
+        <div class="card-header">ステータス別内訳</div>
+        <div style="padding:14px 16px">
+          ${STATUSES.map(s => {
+            const n = cnt(s);
+            return `<div class="prog-row">
+              <span class="badge badge-${s}" style="min-width:60px;text-align:center">${s}</span>
+              <div class="prog-bar"><div class="prog-fill" style="width:${P.length?n/P.length*100:0}%"></div></div>
+              <span style="font-size:13px;font-weight:700;min-width:24px;text-align:right">${n}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">最近の登録物件</div>
+        ${recent.length ? recent.map(p=>`
+          <div style="padding:9px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center"
+               onclick="nav('props');setTimeout(()=>showPropDetail('${p.id}'),50)">
+            <div>
+              <div style="font-size:12px;font-weight:600">${esc(p.name||'未設定')}</div>
+              <div style="font-size:10px;color:var(--text-muted)">${p.ts?new Date(p.ts).toLocaleDateString('ja-JP'):'-'} 登録</div>
+            </div>
+            <span class="badge badge-${p.status||'未提案'}">${p.status||'未提案'}</span>
+          </div>`).join('')
+        : '<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center">物件がありません</div>'}
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card">
+        <div class="card-header">顧客別 提案件数 TOP 5</div>
+        ${topCusts.length ? topCusts.map(([id,n])=>{
+          const c = D.customers.find(x=>x.id===id); if (!c) return '';
+          return `<div style="padding:9px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer"
+                       onclick="filterByCust('${id}')">
+            <span style="font-size:12px">👤 ${esc(c.name)}</span>
+            <span style="background:var(--primary);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px">${n}件</span>
+          </div>`;
+        }).join('') : '<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center">データなし</div>'}
+      </div>
+      <div class="card">
+        <div class="card-header">業者別 物件数 TOP 5</div>
+        ${topAgents.length ? topAgents.map(([id,n])=>{
+          const a = D.agents.find(x=>x.id===id); if (!a) return '';
+          return `<div style="padding:9px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer"
+                       onclick="filterByAgent('${id}')">
+            <span style="font-size:12px">🏪 ${esc(a.name)}</span>
+            <span style="background:#6b46c1;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px">${n}件</span>
+          </div>`;
+        }).join('') : '<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center">データなし</div>'}
+      </div>
+    </div>`;
+}
+
+/* ══════════════════════════════════════════════
+   Export / Import
+══════════════════════════════════════════════ */
+function exportAll() {
+  const blob = new Blob([JSON.stringify(D, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `不動産データ_${new Date().toLocaleDateString('ja-JP').replace(/\//g,'-')}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('データをエクスポートしました', 'ok');
+}
+function importAll() { document.getElementById('imp-file').click(); }
+function onImport(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      if (!d.properties || !d.customers || !d.agents) { toast('無効なデータ形式です', 'err'); return; }
+      if (confirm('既存データを上書きして読み込みますか？\n（PDFデータは引き継がれません）')) {
+        D = d; save(); render(); toast('データを読み込みました', 'ok');
+      }
+    } catch(_) { toast('ファイルの読み込みに失敗しました', 'err'); }
+  };
+  r.readAsText(f); e.target.value = '';
+}
+
+/* ── Bootstrap ── */
+openIDB().then(() => { refreshBadges(); render(); });
+</script>
+</body>
+</html>
