@@ -300,6 +300,20 @@
     ::-webkit-scrollbar-track { background:transparent; }
     ::-webkit-scrollbar-thumb { background:#cbd5e0; border-radius:3px; }
     ::-webkit-scrollbar-thumb:hover { background:#a0aec0; }
+
+    .pdf-lightbox {
+      position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:9999;
+      display:flex; flex-direction:column; align-items:center;
+    }
+    .pdf-lightbox-tb {
+      width:100%; background:rgba(0,0,0,.6); padding:8px 16px;
+      display:flex; align-items:center; gap:10px; flex-shrink:0;
+      color:#fff; font-size:13px;
+    }
+    .pdf-lightbox-body {
+      flex:1; overflow:auto; display:flex; justify-content:center; padding:20px;
+    }
+    .pdf-lightbox-body canvas { max-width:100%; box-shadow:0 4px 24px rgba(0,0,0,.5); }
   </style>
 </head>
 <body>
@@ -366,10 +380,13 @@ if (typeof pdfjsLib !== 'undefined') {
 let idb = null;
 function openIDB() {
   return new Promise((res, rej) => {
-    const r = indexedDB.open('fudosanPDFs', 1);
+    const r = indexedDB.open('fudosanPDFs', 2);
     r.onupgradeneeded = e => {
-      if (!e.target.result.objectStoreNames.contains('pdfs'))
-        e.target.result.createObjectStore('pdfs', { keyPath: 'id' });
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('pdfs'))
+        db.createObjectStore('pdfs', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('docs'))
+        db.createObjectStore('docs', { keyPath: 'id' }); // {id: uid, propId, fileName, data}
     };
     r.onsuccess = e => { idb = e.target.result; res(); };
     r.onerror   = () => rej(r.error);
@@ -399,6 +416,34 @@ function dbDel(id) {
     tx.oncomplete = res; tx.onerror = res;
   });
 }
+function dbDocSave(doc) {
+  return new Promise((res,rej) => {
+    if (!idb) { res(); return; }
+    const tx = idb.transaction('docs','readwrite');
+    tx.objectStore('docs').put(doc);
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+  });
+}
+function dbDocList(propId) {
+  return new Promise(res => {
+    if (!idb) { res([]); return; }
+    const docs = [];
+    const tx   = idb.transaction('docs','readonly');
+    tx.objectStore('docs').openCursor().onsuccess = e => {
+      const cur = e.target.result;
+      if (cur) { if (cur.value.propId === propId) docs.push(cur.value); cur.continue(); }
+      else res(docs);
+    };
+  });
+}
+function dbDocDel(docId) {
+  return new Promise(res => {
+    if (!idb) { res(); return; }
+    const tx = idb.transaction('docs','readwrite');
+    tx.objectStore('docs').delete(docId);
+    tx.oncomplete = res; tx.onerror = res;
+  });
+}
 
 /* ══════════════════════════════════════════════
    localStorage (structured data)
@@ -423,7 +468,7 @@ function saveCfg(cfg) { localStorage.setItem(LS_CFG, JSON.stringify(cfg)); }
 ══════════════════════════════════════════════ */
 let D     = loadData();
 let view  = 'props', q = '', vmode = 'grid';
-let pf    = { status: '', custId: '', agentId: '', type: '' };
+let pf    = { status: '', custId: '', agentId: '', type: '', city: '' };
 let _pdf  = null;
 let _pendingFile = null;
 
@@ -499,6 +544,19 @@ const MODELS = {
     { v:'claude-3-5-sonnet-20241022', l:'claude-3-5-sonnet（有料・高精度）' },
   ]
 };
+const KANAGAWA_CITIES = [
+  '横浜市鶴見区','横浜市神奈川区','横浜市西区','横浜市中区','横浜市南区',
+  '横浜市港南区','横浜市保土ケ谷区','横浜市旭区','横浜市磯子区','横浜市金沢区',
+  '横浜市港北区','横浜市緑区','横浜市青葉区','横浜市都筑区','横浜市戸塚区',
+  '横浜市栄区','横浜市泉区','横浜市瀬谷区',
+  '川崎市川崎区','川崎市幸区','川崎市中原区','川崎市高津区','川崎市多摩区','川崎市宮前区','川崎市麻生区',
+  '相模原市緑区','相模原市中央区','相模原市南区',
+  '横須賀市','平塚市','鎌倉市','藤沢市','小田原市','茅ヶ崎市','逗子市',
+  '三浦市','秦野市','厚木市','大和市','伊勢原市','海老名市','座間市','南足柄市','綾瀬市',
+  '葉山町','寒川町','大磯町','二宮町','中井町','大井町','松田町','山北町','開成町',
+  '箱根町','真鶴町','湯河原町','愛川町','清川村'
+];
+
 // Gemini fallback order for new users
 const GEMINI_FALLBACKS = [
   'gemini-2.0-flash-lite',
@@ -935,6 +993,7 @@ function renderProps() {
     if (pf.custId  && !p.custIds?.includes(pf.custId)) return false;
     if (pf.agentId && p.sellerId!==pf.agentId && p.brokerId!==pf.agentId) return false;
     if (pf.type    && p.type    !== pf.type)    return false;
+    if (pf.city && !(p.location||'').includes(pf.city)) return false;
     return true;
   }).sort((a,b)=>(b.ts||0)-(a.ts||0));
 
@@ -960,7 +1019,11 @@ function renderProps() {
         <option value="">全業者</option>
         ${D.agents.map(a=>`<option value="${a.id}" ${pf.agentId===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}
       </select>
-      <button class="btn btn-secondary btn-sm" onclick="pf={status:'',custId:'',agentId:'',type:''};renderProps()">クリア</button>
+      <select class="f-select" onchange="pf.city=this.value;renderProps()" style="max-width:140px">
+        <option value="">神奈川全域</option>
+        ${KANAGAWA_CITIES.map(c=>`<option value="${c}" ${pf.city===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="pf={status:'',custId:'',agentId:'',type:'',city:''};renderProps()">クリア</button>
       <div style="margin-left:auto" class="view-toggle">
         <button class="${vmode==='grid'?'active':''}" onclick="vmode='grid';renderProps()" title="グリッド">⊞</button>
         <button class="${vmode==='list'?'active':''}" onclick="vmode='list';renderProps()" title="リスト">☰</button>
@@ -1143,6 +1206,17 @@ async function showPropDetail(id) {
           <div>
             <div class="detail-sec-title" style="margin-bottom:8px">📄 販売図面</div>
             <div class="pdf-viewer" id="pv-detail"><div class="pdf-no">読込中…</div></div>
+            <div class="detail-sec" style="margin-top:14px">
+              <div class="detail-sec-title" style="display:flex;align-items:center;gap:8px">
+                📎 追加資料
+                <label style="margin-left:auto;cursor:pointer">
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.docx" multiple style="display:none"
+                    onchange="addDocs('${id}', this.files)">
+                  <span style="background:var(--primary);color:#fff;border-radius:4px;padding:3px 8px;font-size:11px">＋ 追加</span>
+                </label>
+              </div>
+              <div id="doc-list" style="margin-top:8px;font-size:12px;color:var(--text-muted)">読込中…</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1161,6 +1235,8 @@ async function showPropDetail(id) {
           <button onclick="pdfNav(1)">▶</button>
           <span style="flex:1"></span>
           <span style="color:rgba(255,255,255,.4);font-size:10px">${esc(rec.fileName)}</span>
+          <button onclick="openPDFLightbox('${id}')" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer">🔍 拡大</button>
+          <button onclick="downloadPDF('${id}')" style="background:var(--accent);color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer">⬇ DL</button>
         </div>
         <div class="pdf-canvas-wrap" id="pcw"></div>`;
       await renderPDFPage();
@@ -1170,6 +1246,7 @@ async function showPropDetail(id) {
   } else {
     pv.innerHTML = '<div class="pdf-no">販売図面が添付されていません</div>';
   }
+  await loadDocs(id);
 }
 
 async function renderPDFPage() {
@@ -1192,6 +1269,99 @@ async function pdfNav(d) {
   _pdf.page = Math.max(1, Math.min(_pdf.doc.numPages, _pdf.page + d));
   await renderPDFPage();
 }
+async function downloadPDF(id) {
+  const rec = await dbGet(id);
+  if (!rec) { toast('PDFが見つかりません', 'err'); return; }
+  const blob = new Blob([rec.data], { type: 'application/pdf' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = rec.fileName || 'document.pdf';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+let _lb = { doc: null, page: 1 };
+async function openPDFLightbox(id) {
+  const rec = await dbGet(id);
+  if (!rec || typeof pdfjsLib === 'undefined') { toast('PDFが読み込めません','err'); return; }
+  _lb.doc  = await pdfjsLib.getDocument({ data: new Uint8Array(rec.data) }).promise;
+  _lb.page = 1;
+  const div = document.createElement('div');
+  div.className = 'pdf-lightbox';
+  div.id = 'pdf-lb';
+  div.innerHTML = `
+    <div class="pdf-lightbox-tb">
+      <button onclick="lbNav(-1)" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer">◀</button>
+      <span id="lb-info">1 / ${_lb.doc.numPages}</span>
+      <button onclick="lbNav(1)"  style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer">▶</button>
+      <span style="flex:1"></span>
+      <button onclick="downloadPDF('${id}')" style="background:var(--accent);color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px">⬇ ダウンロード</button>
+      <button onclick="document.getElementById('pdf-lb').remove()" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:16px">✕</button>
+    </div>
+    <div class="pdf-lightbox-body" id="lb-body"></div>`;
+  document.body.appendChild(div);
+  await lbRender();
+}
+async function lbRender() {
+  if (!_lb.doc) return;
+  const body = document.getElementById('lb-body'); if (!body) return;
+  const page = await _lb.doc.getPage(_lb.page);
+  const w    = Math.min(window.innerWidth - 40, 1200);
+  const vp0  = page.getViewport({ scale: 1 });
+  const sc   = w / vp0.width;
+  const vp   = page.getViewport({ scale: sc });
+  const cv   = document.createElement('canvas');
+  cv.width = vp.width; cv.height = vp.height;
+  await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+  body.innerHTML = ''; body.appendChild(cv);
+  const info = document.getElementById('lb-info');
+  if (info) info.textContent = `${_lb.page} / ${_lb.doc.numPages}`;
+}
+async function lbNav(d) {
+  if (!_lb.doc) return;
+  _lb.page = Math.max(1, Math.min(_lb.doc.numPages, _lb.page + d));
+  await lbRender();
+}
+
+async function addDocs(propId, files) {
+  for (const f of files) {
+    const data = await f.arrayBuffer();
+    await dbDocSave({ id: uid(), propId, fileName: f.name, data, ts: Date.now() });
+  }
+  toast(`${files.length}件の資料を追加しました`, 'ok');
+  await loadDocs(propId);
+}
+async function loadDocs(propId) {
+  const el = document.getElementById('doc-list'); if (!el) return;
+  const docs = await dbDocList(propId);
+  if (!docs.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:12px">資料がありません</div>'; return; }
+  el.innerHTML = docs.sort((a,b)=>b.ts-a.ts).map(d => `
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.fileName)}">📄 ${esc(d.fileName)}</span>
+      <button onclick="downloadDoc('${d.id}')" style="background:var(--accent);color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:10px;cursor:pointer">⬇</button>
+      <button onclick="deleteDoc('${d.id}','${propId}')" style="background:var(--danger);color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:10px;cursor:pointer">✕</button>
+    </div>`).join('');
+}
+async function downloadDoc(docId) {
+  const tx  = idb.transaction('docs','readonly');
+  const req = tx.objectStore('docs').get(docId);
+  req.onsuccess = () => {
+    const d = req.result; if (!d) return;
+    const blob = new Blob([d.data]);
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = d.fileName;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  };
+}
+async function deleteDoc(docId, propId) {
+  if (!confirm('この資料を削除しますか？')) return;
+  await dbDocDel(docId);
+  toast('資料を削除しました', 'ok');
+  await loadDocs(propId);
+}
+
 async function delProp(id) {
   if (!confirm('この物件を削除しますか？')) return;
   D.properties = D.properties.filter(p => p.id !== id);
