@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>不動産物件管理システム</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --primary: #1a3a5c;
@@ -346,6 +347,9 @@
     <button class="btn btn-accent btn-sm"     onclick="showSettings()">✨ AI自動入力設定</button>
     <button class="btn btn-secondary btn-sm"  onclick="exportAll()">💾 データ書き出し</button>
     <button class="btn btn-secondary btn-sm"  onclick="importAll()">📥 データ読み込み</button>
+    <button class="btn btn-secondary btn-sm" onclick="showSBSettings()" style="position:relative">
+      ☁ クラウド同期 <span id="sb-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#555;margin-left:3px;vertical-align:middle" title="未接続"></span>
+    </button>
     <input type="file" id="imp-file" accept=".json" style="display:none" onchange="onImport(event)">
   </div>
 </div>
@@ -393,20 +397,36 @@ function openIDB() {
   });
 }
 function dbSave(id, fileName, data) {
-  return new Promise((res, rej) => {
+  const saveBuf = data instanceof ArrayBuffer ? data.slice(0) : data;
+  const p = new Promise((res, rej) => {
     if (!idb) { res(); return; }
     const tx = idb.transaction('pdfs', 'readwrite');
-    tx.objectStore('pdfs').put({ id, fileName, data });
+    tx.objectStore('pdfs').put({ id, fileName, data: saveBuf });
     tx.oncomplete = res; tx.onerror = () => rej(tx.error);
   });
+  p.then(() => sbUploadFile(`pdfs/${id}`, saveBuf instanceof ArrayBuffer ? saveBuf.slice(0) : saveBuf));
+  return p;
 }
-function dbGet(id) {
-  return new Promise(res => {
+async function dbGet(id) {
+  const local = await new Promise(res => {
     if (!idb) { res(null); return; }
-    const r = idb.transaction('pdfs', 'readonly').objectStore('pdfs').get(id);
+    const r = idb.transaction('pdfs','readonly').objectStore('pdfs').get(id);
     r.onsuccess = () => res(r.result || null);
     r.onerror   = () => res(null);
   });
+  if (local) return local;
+  if (!sbClient) return null;
+  const buf = await sbDownloadFile(`pdfs/${id}`);
+  if (!buf) return null;
+  const p = D.properties.find(x => x.id === id);
+  const fileName = p?.pdfName || 'file.pdf';
+  await new Promise(res => {
+    if (!idb) { res(); return; }
+    const tx = idb.transaction('pdfs','readwrite');
+    tx.objectStore('pdfs').put({ id, fileName, data: buf });
+    tx.oncomplete = res; tx.onerror = res;
+  });
+  return { id, fileName, data: buf };
 }
 function dbDel(id) {
   return new Promise(res => {
@@ -417,12 +437,17 @@ function dbDel(id) {
   });
 }
 function dbDocSave(doc) {
-  return new Promise((res,rej) => {
+  const { id, data } = doc;
+  const saveBuf = data instanceof ArrayBuffer ? data.slice(0) : data;
+  const docToStore = { ...doc, data: saveBuf };
+  const p = new Promise((res,rej) => {
     if (!idb) { res(); return; }
     const tx = idb.transaction('docs','readwrite');
-    tx.objectStore('docs').put(doc);
+    tx.objectStore('docs').put(docToStore);
     tx.oncomplete = res; tx.onerror = () => rej(tx.error);
   });
+  p.then(() => sbUploadFile(`docs/${id}`, saveBuf instanceof ArrayBuffer ? saveBuf.slice(0) : saveBuf));
+  return p;
 }
 function dbDocList(propId) {
   return new Promise(res => {
@@ -437,12 +462,178 @@ function dbDocList(propId) {
   });
 }
 function dbDocDel(docId) {
+  if (typeof sbRemoveFile === 'function') sbRemoveFile(`docs/${docId}`);
   return new Promise(res => {
     if (!idb) { res(); return; }
     const tx = idb.transaction('docs','readwrite');
     tx.objectStore('docs').delete(docId);
     tx.oncomplete = res; tx.onerror = res;
   });
+}
+
+/* ══════════════════════════════════════════════
+   SUPABASE CLOUD SYNC
+══════════════════════════════════════════════ */
+const SB_LS = 'fudosanSB';
+let sbClient = null;
+let sbSyncing = false;
+
+function getSBCfg() {
+  try { return JSON.parse(localStorage.getItem(SB_LS)) || {}; } catch(_) { return {}; }
+}
+function saveSBCfg(cfg) { localStorage.setItem(SB_LS, JSON.stringify(cfg)); }
+
+function sbSetStatus(s) {
+  const dot = document.getElementById('sb-dot');
+  if (!dot) return;
+  const colors = { off:'#555', ok:'#38a169', err:'#e53e3e', syncing:'#d4a017' };
+  dot.style.background = colors[s] || '#555';
+  dot.title = { off:'未接続', ok:'同期済み', err:'同期エラー', syncing:'同期中…' }[s] || '';
+}
+
+function initSupabase() {
+  const cfg = getSBCfg();
+  if (!cfg.url || !cfg.anonKey) { sbSetStatus('off'); return false; }
+  try {
+    sbClient = window.supabase.createClient(cfg.url, cfg.anonKey);
+    sbSetStatus('ok');
+    return true;
+  } catch(e) { sbClient = null; sbSetStatus('err'); return false; }
+}
+
+async function sbPush() {
+  if (!sbClient || sbSyncing) return;
+  sbSyncing = true; sbSetStatus('syncing');
+  try {
+    const { error } = await sbClient.from('fudosan_data').upsert(
+      { key: 'main', value: D, updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    );
+    sbSetStatus(error ? 'err' : 'ok');
+  } catch(e) { sbSetStatus('err'); }
+  finally { sbSyncing = false; }
+}
+
+async function sbPull() {
+  if (!sbClient) return false;
+  sbSetStatus('syncing');
+  try {
+    const { data, error } = await sbClient.from('fudosan_data')
+      .select('value').eq('key','main').single();
+    if (error || !data) { sbSetStatus('ok'); return false; }
+    const d = data.value;
+    if (d && d.properties && d.customers && d.agents) {
+      D = d;
+      localStorage.setItem(LS, JSON.stringify(D));
+      sbSetStatus('ok');
+      return true;
+    }
+    sbSetStatus('ok'); return false;
+  } catch(e) { sbSetStatus('err'); return false; }
+}
+
+async function sbUploadFile(path, buffer) {
+  if (!sbClient || !buffer) return false;
+  try {
+    const { error } = await sbClient.storage.from('fudosan-files')
+      .upload(path, buffer, { upsert: true, contentType: 'application/octet-stream' });
+    return !error;
+  } catch(e) { return false; }
+}
+
+async function sbDownloadFile(path) {
+  if (!sbClient) return null;
+  try {
+    const { data, error } = await sbClient.storage.from('fudosan-files').download(path);
+    if (error || !data) return null;
+    return await data.arrayBuffer();
+  } catch(e) { return null; }
+}
+
+async function sbRemoveFile(path) {
+  if (!sbClient) return;
+  try { await sbClient.storage.from('fudosan-files').remove([path]); } catch(_) {}
+}
+
+async function sbManualSync() {
+  if (!sbClient) { toast('Supabase未接続です', 'err'); return; }
+  const pulled = await sbPull();
+  if (pulled) { render(); refreshBadges(); toast('クラウドから同期しました', 'ok'); }
+  else { await sbPush(); toast('クラウドに保存しました', 'ok'); }
+}
+
+function showSBSettings() {
+  const cfg = getSBCfg();
+  showModal(`
+    <div class="modal" style="max-width:560px">
+      <div class="modal-hd">
+        <div>
+          <div class="modal-title">☁ クラウド同期設定（Supabase）</div>
+          <div class="modal-subtitle">iPhone・iPadと物件データを自動同期します</div>
+        </div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.9;color:#2b6cb0">
+          <strong>📋 初回設定手順（1回だけ）</strong><br>
+          1. <a href="https://supabase.com" target="_blank" style="color:#2b6cb0;text-decoration:underline">supabase.com</a> で無料アカウントを作成<br>
+          2. 「New project」でプロジェクトを作成（Regionは Northeast Asia を推奨）<br>
+          3. 左メニュー「SQL Editor」で下のSQLをコピーして実行<br>
+          4. 左メニュー「Project Settings → API」からURLとanon keyをコピー
+        </div>
+        <div style="background:#1a202c;border-radius:8px;padding:12px;margin-bottom:14px;font-size:10.5px;font-family:monospace;color:#e2e8f0;white-space:pre;overflow-x:auto;line-height:1.7">-- ① テーブル作成
+create table if not exists fudosan_data (
+  key text primary key,
+  value jsonb not null,
+  updated_at timestamptz default now()
+);
+alter table fudosan_data enable row level security;
+create policy "allow_all" on fudosan_data
+  for all using (true) with check (true);
+
+-- ② ストレージ作成（PDF・資料用）
+insert into storage.buckets (id, name, public)
+  values ('fudosan-files', 'fudosan-files', false)
+  on conflict do nothing;
+create policy "allow_files" on storage.objects
+  for all using (bucket_id = 'fudosan-files')
+  with check (bucket_id = 'fudosan-files');</div>
+        <div class="form-group">
+          <label>Project URL <span class="req">*</span></label>
+          <input type="text" id="sb-url" value="${ea(cfg.url||'')}"
+            placeholder="https://xxxxxxxxxxxxxxxxxxxx.supabase.co"
+            style="font-family:monospace;font-size:12px">
+        </div>
+        <div class="form-group">
+          <label>anon public key <span class="req">*</span></label>
+          <input type="password" id="sb-key" value="${ea(cfg.anonKey||'')}"
+            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            style="font-family:monospace;font-size:11px">
+        </div>
+        ${sbClient ? `<div style="background:#f0fff4;border:1px solid #9ae6b4;border-radius:6px;padding:8px 12px;font-size:12px;color:#276749">✅ 接続中 — データは自動的にクラウドへ同期されます</div>` : ''}
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-secondary" onclick="closeModal()">閉じる</button>
+        ${sbClient ? `<button class="btn btn-secondary" onclick="sbManualSync();closeModal()">🔄 今すぐ同期</button>` : ''}
+        <button class="btn btn-primary" onclick="saveSBAndConnect()">接続する</button>
+      </div>
+    </div>`);
+}
+
+async function saveSBAndConnect() {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  if (!url || !key) { toast('URLとAPIキーを入力してください','err'); return; }
+  saveSBCfg({ url, anonKey: key });
+  if (initSupabase()) {
+    const pulled = await sbPull();
+    if (pulled) { render(); refreshBadges(); }
+    else await sbPush();
+    toast('Supabaseに接続しました！データを同期しています…','ok');
+  } else {
+    toast('接続に失敗しました。URLとキーを確認してください','err'); return;
+  }
+  closeModal();
 }
 
 /* ══════════════════════════════════════════════
@@ -453,7 +644,7 @@ function loadData() {
   try { const r = localStorage.getItem(LS); if (r) return JSON.parse(r); } catch(_) {}
   return { properties: [], customers: [], agents: [] };
 }
-function save() { localStorage.setItem(LS, JSON.stringify(D)); refreshBadges(); }
+function save() { localStorage.setItem(LS, JSON.stringify(D)); refreshBadges(); if (sbClient) sbPush(); }
 
 /* ══════════════════════════════════════════════
    Settings (API key, model)
@@ -1324,40 +1515,61 @@ async function lbNav(d) {
 }
 
 async function addDocs(propId, files) {
+  const p = D.properties.find(x => x.id === propId);
+  if (!p.docMeta) p.docMeta = [];
   for (const f of files) {
     const data = await f.arrayBuffer();
-    await dbDocSave({ id: uid(), propId, fileName: f.name, data, ts: Date.now() });
+    const docId = uid();
+    await dbDocSave({ id: docId, propId, fileName: f.name, data, ts: Date.now() });
+    p.docMeta.push({ id: docId, propId, fileName: f.name, ts: Date.now() });
   }
+  save();
   toast(`${files.length}件の資料を追加しました`, 'ok');
   await loadDocs(propId);
 }
 async function loadDocs(propId) {
   const el = document.getElementById('doc-list'); if (!el) return;
-  const docs = await dbDocList(propId);
+  // メタデータはDから（クラウド同期済み）、なければIndexedDBから取得
+  const p = D.properties.find(x => x.id === propId);
+  let docs = (p && p.docMeta) ? [...p.docMeta] : await dbDocList(propId);
   if (!docs.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:12px">資料がありません</div>'; return; }
   el.innerHTML = docs.sort((a,b)=>b.ts-a.ts).map(d => `
     <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">
       <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.fileName)}">📄 ${esc(d.fileName)}</span>
-      <button onclick="downloadDoc('${d.id}')" style="background:var(--accent);color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:10px;cursor:pointer">⬇</button>
+      <button onclick="downloadDoc('${d.id}','${propId}')" style="background:var(--accent);color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:10px;cursor:pointer">⬇</button>
       <button onclick="deleteDoc('${d.id}','${propId}')" style="background:var(--danger);color:#fff;border:none;border-radius:3px;padding:2px 6px;font-size:10px;cursor:pointer">✕</button>
     </div>`).join('');
 }
-async function downloadDoc(docId) {
-  const tx  = idb.transaction('docs','readonly');
-  const req = tx.objectStore('docs').get(docId);
-  req.onsuccess = () => {
-    const d = req.result; if (!d) return;
-    const blob = new Blob([d.data]);
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = d.fileName;
-    document.body.appendChild(a); a.click();
-    document.body.removeChild(a); URL.revokeObjectURL(url);
-  };
+async function downloadDoc(docId, propId) {
+  // ローカルIndexedDBを試みる
+  let rec = await new Promise(res => {
+    if (!idb) { res(null); return; }
+    const r = idb.transaction('docs','readonly').objectStore('docs').get(docId);
+    r.onsuccess = () => res(r.result || null);
+    r.onerror   = () => res(null);
+  });
+  if (!rec || !rec.data) {
+    // Supabaseからダウンロード
+    const buf = await sbDownloadFile(`docs/${docId}`);
+    if (!buf) { toast('ファイルが見つかりません','err'); return; }
+    const p2 = D.properties.find(x => x.id === propId);
+    const meta = (p2?.docMeta||[]).find(x => x.id === docId);
+    rec = { id: docId, fileName: meta?.fileName || docId, data: buf };
+    // ローカルにキャッシュ
+    await dbDocSave({ id: docId, propId: propId||'', fileName: rec.fileName, data: buf, ts: Date.now() });
+  }
+  const blob = new Blob([rec.data]);
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = rec.fileName;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 async function deleteDoc(docId, propId) {
   if (!confirm('この資料を削除しますか？')) return;
   await dbDocDel(docId);
+  const p = D.properties.find(x => x.id === propId);
+  if (p && p.docMeta) { p.docMeta = p.docMeta.filter(x => x.id !== docId); save(); }
   toast('資料を削除しました', 'ok');
   await loadDocs(propId);
 }
@@ -2067,7 +2279,15 @@ function onImport(e) {
 }
 
 /* ── Bootstrap ── */
-openIDB().then(() => { refreshBadges(); render(); });
+openIDB().then(async () => {
+  initSupabase();
+  if (sbClient) {
+    const pulled = await sbPull();
+    if (pulled) { refreshBadges(); render(); return; }
+  }
+  refreshBadges();
+  render();
+});
 </script>
 </body>
 </html>
