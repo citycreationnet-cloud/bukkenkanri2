@@ -6,6 +6,8 @@
   <title>不動産物件管理システム</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
     :root {
       --primary: #1a3a5c;
@@ -95,7 +97,7 @@
     .card-header { padding:12px 16px; border-bottom:1px solid var(--border); font-size:13px; font-weight:700; color:var(--primary); }
 
     /* ── Stats ── */
-    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px; }
+    .stats-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:18px; }
     .stat-card { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:14px 16px; }
     .stat-label { font-size:11px; color:var(--text-muted); }
     .stat-value { font-size:26px; font-weight:800; margin:2px 0; }
@@ -109,6 +111,30 @@
     .badge-見送り { background:#f7fafc; color:#718096; border:1px solid #e2e8f0; }
     .badge-未提案 { background:#f7fafc; color:#a0aec0; border:1px solid #e2e8f0; }
     .badge-type   { background:#edf2f7; color:#4a5568; }
+    /* 売買 */
+    .badge-査定中       { background:#e9d8fd; color:#553c9a; }
+    .badge-媒介契約     { background:#bee3f8; color:#2c5282; }
+    .badge-販売活動中   { background:#fefcbf; color:#744210; }
+    .badge-見送り       { background:#f7fafc; color:#718096; border:1px solid #e2e8f0; }
+    /* 賃貸 */
+    .badge-募集中       { background:#c6f6d5; color:#22543d; }
+    .badge-契約済       { background:#b2f5ea; color:#234e52; }
+    .badge-入居中       { background:#bee3f8; color:#2c5282; }
+    .badge-退去予定     { background:#fed7d7; color:#822727; }
+    .badge-空室         { background:#faf5ff; color:#553c9a; border:1px solid #d6bcfa; }
+    /* Category badges */
+    .badge-cat-売買   { background:#2b6cb0; color:#fff; }
+    .badge-cat-賃貸   { background:#276749; color:#fff; }
+    .badge-cat-収益   { background:#744210; color:#fff; }
+    /* Market source badges */
+    .badge-src-reins  { background:#2c5282; color:#fff; }
+    .badge-src-suumo  { background:#c53030; color:#fff; }
+    .badge-src-homes  { background:#276749; color:#fff; }
+    .badge-src-manual { background:#718096; color:#fff; }
+    .badge-src-mlit   { background:#744210; color:#fff; }
+    /* HP public badge */
+    .badge-hp-on  { background:#276749; color:#fff; }
+    .badge-hp-off { background:#a0aec0; color:#fff; }
 
     /* ── Property Grid ── */
     .prop-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:14px; }
@@ -315,6 +341,51 @@
       flex:1; overflow:auto; display:flex; justify-content:center; padding:20px;
     }
     .pdf-lightbox-body canvas { max-width:100%; box-shadow:0 4px 24px rgba(0,0,0,.5); }
+
+    /* ── Market Analysis ── */
+    .mkt-tabs { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:16px; }
+    .mkt-tab  { padding:8px 18px; font-size:13px; font-weight:600; cursor:pointer; color:var(--text-muted); border-bottom:2px solid transparent; margin-bottom:-2px; }
+    .mkt-tab.active { color:var(--primary); border-bottom-color:var(--accent); }
+    .mkt-stat-row { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:16px; }
+    .mkt-stat { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:12px 14px; }
+    .mkt-stat .ms-label { font-size:10px; color:var(--text-muted); margin-bottom:2px; }
+    .mkt-stat .ms-val   { font-size:20px; font-weight:800; }
+    .mkt-stat .ms-sub   { font-size:10px; color:var(--text-muted); }
+    /* SVG bar chart */
+    .chart-wrap { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; }
+    .chart-title { font-size:12px; font-weight:700; color:var(--primary); margin-bottom:12px; }
+    .bar-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+    .bar-label { font-size:11px; color:var(--text); width:130px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .bar-track { flex:1; background:var(--bg); border-radius:3px; height:18px; position:relative; overflow:hidden; }
+    .bar-fill  { height:100%; border-radius:3px; display:flex; align-items:center; padding-left:6px; font-size:10px; color:#fff; font-weight:700; transition:width .4s; }
+    .bar-val   { font-size:11px; font-weight:700; width:70px; text-align:right; flex-shrink:0; }
+    /* Price history */
+    .ph-row { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--border); font-size:12px; }
+    .ph-date { color:var(--text-muted); font-size:11px; width:80px; flex-shrink:0; }
+    .ph-price { font-weight:700; color:var(--primary); }
+    .ph-delta { font-size:10px; margin-left:4px; }
+    .ph-delta.down { color:var(--success); }
+    .ph-delta.up   { color:var(--danger); }
+    /* Comparable table */
+    .comp-tbl td { font-size:11px; padding:6px 8px; }
+    .source-tag { font-size:10px; padding:1px 5px; border-radius:4px; font-weight:600; white-space:nowrap; }
+
+    /* ── Market Map ── */
+    #market-map { width:100%; height:500px; border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); }
+    .map-legend { display:flex; gap:14px; flex-wrap:wrap; padding:10px 14px; background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); margin-top:10px; font-size:12px; }
+    .map-leg-item { display:flex; align-items:center; gap:5px; }
+    .map-leg-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+    .geocode-status { font-size:11px; color:var(--text-muted); padding:4px 0; }
+
+    /* ── Inquiry Tracking ── */
+    .inq-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:8px; }
+    .inq-cell { background:#fff; border:1px solid var(--border); border-radius:6px; padding:8px 10px; }
+    .inq-cell .inq-label { font-size:10px; color:var(--text-muted); margin-bottom:4px; font-weight:600; }
+    .inq-cell input { width:100%; border:1px solid var(--border); border-radius:4px; padding:3px 6px; font-size:13px; font-weight:700; color:var(--primary); text-align:center; outline:none; }
+    .inq-cell .inq-sub { font-size:10px; color:var(--text-muted); text-align:center; margin-top:2px; }
+
+    /* ── Seller Page Button ── */
+    .seller-btn { background:linear-gradient(135deg,#1a3a5c,#2c5282); color:#fff; }
   </style>
 </head>
 <body>
@@ -338,6 +409,10 @@
     <div class="nav-item" data-view="agents" onclick="nav('agents')">
       <span class="nav-icon">🏪</span><span>業者管理</span>
       <span class="nav-badge" id="nb-agents">0</span>
+    </div>
+    <div class="nav-item" data-view="market" onclick="nav('market')">
+      <span class="nav-icon">📈</span><span>市場データ</span>
+      <span class="nav-badge" id="nb-market">0</span>
     </div>
     <div class="nav-item" data-view="dash"   onclick="nav('dash')">
       <span class="nav-icon">📊</span><span>ダッシュボード</span>
@@ -523,6 +598,7 @@ async function sbPull() {
     if (error || !data) { sbSetStatus('ok'); return false; }
     const d = data.value;
     if (d && d.properties && d.customers && d.agents) {
+      if (!d.marketData) d.marketData = [];
       D = d;
       localStorage.setItem(LS, JSON.stringify(D));
       sbSetStatus('ok');
@@ -641,8 +717,15 @@ async function saveSBAndConnect() {
 ══════════════════════════════════════════════ */
 const LS = 'fudosanData', LS_CFG = 'fudosanConfig';
 function loadData() {
-  try { const r = localStorage.getItem(LS); if (r) return JSON.parse(r); } catch(_) {}
-  return { properties: [], customers: [], agents: [] };
+  try {
+    const r = localStorage.getItem(LS);
+    if (r) {
+      const d = JSON.parse(r);
+      if (!d.marketData) d.marketData = [];
+      return d;
+    }
+  } catch(_) {}
+  return { properties: [], customers: [], agents: [], marketData: [] };
 }
 function save() { localStorage.setItem(LS, JSON.stringify(D)); refreshBadges(); if (sbClient) sbPush(); }
 
@@ -659,7 +742,7 @@ function saveCfg(cfg) { localStorage.setItem(LS_CFG, JSON.stringify(cfg)); }
 ══════════════════════════════════════════════ */
 let D     = loadData();
 let view  = 'props', q = '', vmode = 'grid';
-let pf    = { status: '', custId: '', agentId: '', type: '', city: '' };
+let pf    = { status: '', custId: '', agentId: '', type: '', city: '', category: '' };
 let _pdf  = null;
 let _pendingFile = null;
 
@@ -683,6 +766,8 @@ function refreshBadges() {
   document.getElementById('nb-props').textContent  = D.properties.length;
   document.getElementById('nb-custs').textContent  = D.customers.length;
   document.getElementById('nb-agents').textContent = D.agents.length;
+  const nb = document.getElementById('nb-market');
+  if (nb) nb.textContent = (D.marketData||[]).length;
 }
 
 /* ══════════════════════════════════════════════
@@ -707,17 +792,27 @@ function overlayClose(e)  { if (e.target.classList.contains('overlay')) closeMod
 /* ══════════════════════════════════════════════
    Navigation
 ══════════════════════════════════════════════ */
+let mktTab = 'list'; // 'list' | 'analysis' | 'map'
+let _leafletMap = null; // Leaflet map instance (kept alive between re-renders)
+let mktCity = ''; // 相場分析の市区町村フィルター
+let mktType = ''; // 種別フィルター（''=全て, '一戸建て', 'マンション', '土地', 'アパート'）
+let mktPage = 0;  // データ一覧 現在ページ（0始まり）
+const MKT_PAGE_SIZE = 50;
+
 function nav(v) {
   view = v;
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === v));
-  const titles = { props:'物件一覧', custs:'顧客管理', agents:'業者管理', dash:'ダッシュボード' };
-  document.getElementById('pg-title').textContent = titles[v];
+  const titles = { props:'物件一覧', custs:'顧客管理', agents:'業者管理', market:'市場データ', dash:'ダッシュボード' };
+  document.getElementById('pg-title').textContent = titles[v] || v;
   document.getElementById('srch').value = ''; q = '';
+  // Update add button label
+  const addBtn = document.getElementById('add-btn');
+  if (addBtn) addBtn.textContent = v === 'market' ? '＋ 物件を登録' : '＋ 新規登録';
   render();
 }
 function onSearch() { q = document.getElementById('srch').value.toLowerCase(); render(); }
-function onAdd()    { const m = { props:'showPropModal', custs:'showCustModal', agents:'showAgentModal', dash:'showPropModal' }; window[m[view]](); }
-function render()   { const m = { props:renderProps, custs:renderCusts, agents:renderAgents, dash:renderDash }; m[view]?.(); }
+function onAdd()    { const m = { props:'showPropModal', custs:'showCustModal', agents:'showAgentModal', dash:'showPropModal', market:'showMarketEntry' }; window[m[view]]?.(); }
+function render()   { const m = { props:renderProps, custs:renderCusts, agents:renderAgents, dash:renderDash, market:renderMarket }; m[view]?.(); }
 
 /* ══════════════════════════════════════════════
    SETTINGS MODAL
@@ -747,6 +842,40 @@ const KANAGAWA_CITIES = [
   '葉山町','寒川町','大磯町','二宮町','中井町','大井町','松田町','山北町','開成町',
   '箱根町','真鶴町','湯河原町','愛川町','清川村'
 ];
+
+/* ── 国土交通省 不動産取引価格情報 連携用 市区町村コード ── */
+const MLIT_CITIES = [
+  {code:'14101',name:'横浜市鶴見区'},{code:'14102',name:'横浜市神奈川区'},
+  {code:'14103',name:'横浜市西区'},{code:'14104',name:'横浜市中区'},
+  {code:'14105',name:'横浜市南区'},{code:'14106',name:'横浜市港南区'},
+  {code:'14107',name:'横浜市保土ケ谷区'},{code:'14108',name:'横浜市旭区'},
+  {code:'14109',name:'横浜市磯子区'},{code:'14110',name:'横浜市金沢区'},
+  {code:'14111',name:'横浜市港北区'},{code:'14112',name:'横浜市緑区'},
+  {code:'14113',name:'横浜市青葉区'},{code:'14114',name:'横浜市都筑区'},
+  {code:'14115',name:'横浜市戸塚区'},{code:'14116',name:'横浜市栄区'},
+  {code:'14117',name:'横浜市泉区'},{code:'14118',name:'横浜市瀬谷区'},
+  {code:'14131',name:'川崎市川崎区'},{code:'14132',name:'川崎市幸区'},
+  {code:'14133',name:'川崎市中原区'},{code:'14134',name:'川崎市高津区'},
+  {code:'14135',name:'川崎市多摩区'},{code:'14136',name:'川崎市宮前区'},
+  {code:'14137',name:'川崎市麻生区'},{code:'14151',name:'相模原市緑区'},
+  {code:'14152',name:'相模原市中央区'},{code:'14153',name:'相模原市南区'},
+  {code:'14201',name:'横須賀市'},{code:'14203',name:'平塚市'},
+  {code:'14204',name:'鎌倉市'},{code:'14205',name:'藤沢市'},
+  {code:'14206',name:'小田原市'},{code:'14207',name:'茅ヶ崎市'},
+  {code:'14208',name:'逗子市'},{code:'14210',name:'三浦市'},
+  {code:'14211',name:'秦野市'},{code:'14212',name:'厚木市'},
+  {code:'14213',name:'大和市'},{code:'14214',name:'伊勢原市'},
+  {code:'14215',name:'海老名市'},{code:'14216',name:'座間市'},
+  {code:'14217',name:'南足柄市'},{code:'14218',name:'綾瀬市'},
+  {code:'14301',name:'葉山町'},{code:'14321',name:'寒川町'},
+  {code:'14341',name:'大磯町'},{code:'14342',name:'二宮町'},
+  {code:'14361',name:'中井町'},{code:'14362',name:'大井町'},
+  {code:'14363',name:'松田町'},{code:'14364',name:'山北町'},
+  {code:'14365',name:'開成町'},{code:'14382',name:'箱根町'},
+  {code:'14383',name:'真鶴町'},{code:'14384',name:'湯河原町'},
+  {code:'14401',name:'愛川町'},{code:'14402',name:'清川村'},
+];
+const MLIT_BASE = 'https://citycreationnet-cloud.github.io/market-pricesearch/cache/';
 
 // Gemini fallback order for new users
 const GEMINI_FALLBACKS = [
@@ -1180,23 +1309,29 @@ function renderProps() {
       const hay = `${p.name} ${p.location} ${p.notes} ${ag1?.name||''} ${ag2?.name||''}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
-    if (pf.status  && p.status  !== pf.status)  return false;
-    if (pf.custId  && !p.custIds?.includes(pf.custId)) return false;
-    if (pf.agentId && p.sellerId!==pf.agentId && p.brokerId!==pf.agentId) return false;
-    if (pf.type    && p.type    !== pf.type)    return false;
-    if (pf.city && !(p.location||'').includes(pf.city)) return false;
+    if (pf.status   && p.status   !== pf.status)  return false;
+    if (pf.custId   && !p.custIds?.includes(pf.custId)) return false;
+    if (pf.agentId  && p.sellerId!==pf.agentId && p.brokerId!==pf.agentId) return false;
+    if (pf.type     && p.type     !== pf.type)    return false;
+    if (pf.category && p.category !== pf.category) return false;
+    if (pf.city     && !(p.location||'').includes(pf.city)) return false;
     return true;
   }).sort((a,b)=>(b.ts||0)-(a.ts||0));
 
-  const STATUSES = ['検討中','申込中','成約','見送り','未提案'];
-  const TYPES    = ['マンション','一戸建て','土地','店舗','その他'];
+  const CATEGORIES = ['売買','賃貸','収益'];
+  const ALL_STATUSES = [...new Set(['未提案','査定中','媒介契約','販売活動中','検討中','申込中','成約','見送り','募集中','契約済','入居中','退去予定','空室'])];
+  const TYPES = ['マンション','一戸建て','土地','店舗','その他'];
 
   let h = `
     <div class="filter-bar">
       <span style="font-size:11px;color:var(--text-muted)">絞り込み</span>
+      <select class="f-select" onchange="pf.category=this.value;renderProps()">
+        <option value="">全カテゴリ</option>
+        ${CATEGORIES.map(c=>`<option value="${c}" ${pf.category===c?'selected':''}>${c}</option>`).join('')}
+      </select>
       <select class="f-select" onchange="pf.status=this.value;renderProps()">
         <option value="">全ステータス</option>
-        ${STATUSES.map(s=>`<option value="${s}" ${pf.status===s?'selected':''}>${s}</option>`).join('')}
+        ${ALL_STATUSES.map(s=>`<option value="${s}" ${pf.status===s?'selected':''}>${s}</option>`).join('')}
       </select>
       <select class="f-select" onchange="pf.type=this.value;renderProps()">
         <option value="">全種別</option>
@@ -1214,7 +1349,7 @@ function renderProps() {
         <option value="">神奈川全域</option>
         ${KANAGAWA_CITIES.map(c=>`<option value="${c}" ${pf.city===c?'selected':''}>${c}</option>`).join('')}
       </select>
-      <button class="btn btn-secondary btn-sm" onclick="pf={status:'',custId:'',agentId:'',type:'',city:''};renderProps()">クリア</button>
+      <button class="btn btn-secondary btn-sm" onclick="pf={status:'',custId:'',agentId:'',type:'',city:'',category:''};renderProps()">クリア</button>
       <div style="margin-left:auto" class="view-toggle">
         <button class="${vmode==='grid'?'active':''}" onclick="vmode='grid';renderProps()" title="グリッド">⊞</button>
         <button class="${vmode==='list'?'active':''}" onclick="vmode='list';renderProps()" title="リスト">☰</button>
@@ -1238,7 +1373,11 @@ function renderProps() {
         <div class="prop-card" onclick="showPropDetail('${p.id}')">
           <div class="prop-card-hd">
             <span class="name">${esc(p.name||'物件名未設定')}</span>
-            ${p.type?`<span class="badge badge-type" style="font-size:10px;flex-shrink:0">${esc(p.type)}</span>`:''}
+            <div style="display:flex;gap:3px;flex-shrink:0">
+              ${p.category?`<span class="badge badge-cat-${p.category}" style="font-size:9px">${esc(p.category)}</span>`:''}
+              ${p.type?`<span class="badge badge-type" style="font-size:9px">${esc(p.type)}</span>`:''}
+              ${p.isPublic?`<span class="badge badge-hp-on" style="font-size:9px">HP</span>`:''}
+            </div>
           </div>
           <div class="prop-thumb" id="th-${p.id}">
             <div class="no-pdf">📄<br>読込中…</div>
@@ -1326,8 +1465,11 @@ async function showPropDetail(id) {
           <div class="modal-title">${esc(p.name||'物件詳細')}</div>
           <div class="modal-subtitle">登録日: ${p.ts?new Date(p.ts).toLocaleDateString('ja-JP'):'-'}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          ${p.category?`<span class="badge badge-cat-${p.category}">${esc(p.category)}</span>`:''}
           <span class="badge badge-${p.status||'未提案'}" style="font-size:13px">${p.status||'未提案'}</span>
+          ${p.isPublic?`<span class="badge badge-hp-on">🌐 HP公開中</span>`:``}
+          <button class="btn btn-sm seller-btn" onclick="generateSellerPage('${p.id}')">📊 売主マイページ</button>
           <button class="btn btn-secondary btn-sm" onclick="closeModal();showPropModal('${p.id}')">✏️ 編集</button>
           <button class="btn btn-danger btn-sm" onclick="delProp('${p.id}')">🗑</button>
           <span class="modal-close" onclick="closeModal()">✕</span>
@@ -1393,6 +1535,79 @@ async function showPropDetail(id) {
               <div class="detail-sec-title">📝 メモ</div>
               <div style="font-size:12px;line-height:1.7;white-space:pre-wrap;background:var(--bg);padding:10px;border-radius:6px">${esc(p.notes)}</div>
             </div>`:''}
+            ${p.hpDescription?`<div class="detail-sec">
+              <div class="detail-sec-title">🌐 HP表示テキスト</div>
+              <div style="font-size:12px;line-height:1.7;white-space:pre-wrap;background:#f0fff4;padding:10px;border-radius:6px;border:1px solid #9ae6b4">${esc(p.hpDescription)}</div>
+            </div>`:''}
+            ${(p.priceHistory||[]).length > 1 ? `<div class="detail-sec">
+              <div class="detail-sec-title">💹 価格変更履歴</div>
+              ${(p.priceHistory||[]).slice().reverse().map((h, i, arr) => {
+                const prev = arr[i + 1];
+                const delta = prev ? h.price - prev.price : 0;
+                const dStr = delta !== 0 ? ` <span class="ph-delta ${delta < 0 ? 'down' : 'up'}">${delta < 0 ? '▼' : '▲'}${Math.abs(delta).toLocaleString()}万</span>` : '';
+                return `<div class="ph-row"><span class="ph-date">${h.date}</span><span class="ph-price">${parseInt(h.price).toLocaleString()}万円</span>${dStr}${h.note ? `<span style="color:var(--text-muted);font-size:10px">${esc(h.note)}</span>` : ''}</div>`;
+              }).join('')}
+            </div>` : ''}
+            <!-- Inquiry tracking -->
+            <div class="detail-sec">
+              <div class="detail-sec-title" style="display:flex;align-items:center;gap:6px">
+                📣 ポータル別 反響
+                <button class="btn btn-xs" style="background:var(--primary);color:#fff;margin-left:auto" onclick="saveInquiries('${p.id}')">💾 保存</button>
+              </div>
+              <div class="inq-grid" style="margin-top:8px">
+                ${['suumo','homes','athome','other'].map(key => {
+                  const labels = {suumo:'SUUMO',homes:"HOME'S",athome:'athome',other:'その他'};
+                  const d = (p.inquiries||{})[key]||{};
+                  return `<div class="inq-cell">
+                    <div class="inq-label">${labels[key]}</div>
+                    <input type="number" id="inq-${key}-count-${p.id}" value="${parseInt(d.count)||0}" min="0" placeholder="0">
+                    <div class="inq-sub">問合せ件数</div>
+                    <input type="number" id="inq-${key}-views-${p.id}" value="${parseInt(d.views)||0}" min="0" placeholder="0" style="margin-top:4px">
+                    <div class="inq-sub">閲覧数</div>
+                  </div>`;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- Showing records -->
+            <div class="detail-sec">
+              <div class="detail-sec-title" style="display:flex;align-items:center;gap:6px">
+                🏃 内見記録
+                <button class="btn btn-xs btn-primary" onclick="addShowing('${p.id}')" style="margin-left:auto">＋ 追加</button>
+              </div>
+              <div id="showing-list-${p.id}">
+                ${((p.showings||[]).slice().reverse()).map(sh => `
+                  <div class="ph-row">
+                    <span class="ph-date">${esc(sh.date||'')}</span>
+                    <span style="font-size:12px;flex:1">${esc(sh.name||'')}</span>
+                    ${sh.result?`<span class="badge badge-検討中" style="font-size:10px">${esc(sh.result)}</span>`:''}
+                  </div>`).join('') || '<div style="font-size:11px;color:var(--text-muted)">内見記録なし</div>'}
+              </div>
+            </div>
+
+            <!-- Agent reports -->
+            <div class="detail-sec">
+              <div class="detail-sec-title" style="display:flex;align-items:center;gap:6px">
+                📝 活動報告
+                <button class="btn btn-xs btn-primary" onclick="addAgentReport('${p.id}')" style="margin-left:auto">＋ 追加</button>
+              </div>
+              <div id="report-list-${p.id}">
+                ${((p.agentReports||[]).slice().reverse().slice(0,3)).map(r => `
+                  <div style="border-left:3px solid var(--primary-light);padding:6px 10px;margin-bottom:6px;background:var(--bg);border-radius:0 5px 5px 0;font-size:11px">
+                    <div style="color:var(--text-muted);margin-bottom:3px">${esc(r.date||'')} ${r.author?'- '+esc(r.author):''}</div>
+                    <div style="line-height:1.6;white-space:pre-wrap">${esc(r.content||'')}</div>
+                  </div>`).join('') || '<div style="font-size:11px;color:var(--text-muted)">報告なし</div>'}
+              </div>
+            </div>
+
+            <!-- Nearby market comparables -->
+            <div class="detail-sec">
+              <div class="detail-sec-title" style="display:flex;align-items:center;gap:6px">
+                📊 近隣成約事例
+                <button class="btn btn-secondary btn-xs" onclick="showNearbyComps('${p.id}')">表示</button>
+              </div>
+              <div id="nearby-comps" style="margin-top:6px;font-size:11px;color:var(--text-muted)">ボタンを押してエリア内の事例を表示</div>
+            </div>
           </div>
           <div>
             <div class="detail-sec-title" style="margin-bottom:8px">📄 販売図面</div>
@@ -1574,6 +1789,128 @@ async function deleteDoc(docId, propId) {
   await loadDocs(propId);
 }
 
+function showNearbyComps(propId) {
+  const p = D.properties.find(x => x.id === propId); if (!p) return;
+  const loc = (p.location||'').toLowerCase();
+  // Match on any city part of location
+  const mktList = (D.marketData||[]).filter(m => {
+    const ml = (m.location||'').toLowerCase();
+    // Try to find overlapping text (city/ward level)
+    const parts = loc.split(/[都道府県市区町村]/).filter(Boolean);
+    return parts.some(part => part.length > 1 && ml.includes(part));
+  }).sort((a,b) => (b.importedAt||0) - (a.importedAt||0)).slice(0, 10);
+
+  const el = document.getElementById('nearby-comps');
+  if (!el) return;
+
+  if (!mktList.length) {
+    el.innerHTML = '<span style="color:var(--text-muted)">市場データが見つかりません。市場データビューからSUUMO/レインズデータを取り込んでください。</span>';
+    return;
+  }
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;margin-top:4px">
+    <thead><tr style="background:var(--bg)">
+      <th style="padding:4px 6px;font-size:10px;color:var(--text-muted);text-align:left">所在地</th>
+      <th style="padding:4px 6px;font-size:10px;color:var(--text-muted);text-align:left">種別/間取</th>
+      <th style="padding:4px 6px;font-size:10px;color:var(--text-muted);text-align:right">価格</th>
+      <th style="padding:4px 6px;font-size:10px;color:var(--text-muted);text-align:right">㎡単価</th>
+      <th style="padding:4px 6px;font-size:10px;color:var(--text-muted);text-align:left">情報源</th>
+    </tr></thead><tbody>
+    ${mktList.map(m => {
+      const sqm = m.pricePerSqm ? m.pricePerSqm.toFixed(1) : '-';
+      const srcClr = {reins:'#2c5282',suumo:'#c53030',homes:'#276749',manual:'#718096'}[m.source]||'#718096';
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:4px 6px;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.location||'-')}</td>
+        <td style="padding:4px 6px;font-size:10px">${esc(m.type||'-')} ${esc(m.layout||'')}</td>
+        <td style="padding:4px 6px;font-size:11px;font-weight:700;text-align:right">${m.price?parseInt(m.price).toLocaleString()+'万':'-'}</td>
+        <td style="padding:4px 6px;font-size:10px;text-align:right">${sqm !== '-' ? sqm+'万/㎡' : '-'}</td>
+        <td style="padding:4px 6px"><span style="background:${srcClr};color:#fff;padding:1px 5px;border-radius:3px;font-size:9px">${m.source||'?'}</span></td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>`;
+}
+
+/* ── Inquiry tracking ── */
+function saveInquiries(propId) {
+  const p = D.properties.find(x => x.id === propId); if (!p) return;
+  if (!p.inquiries) p.inquiries = {};
+  ['suumo','homes','athome','other'].forEach(key => {
+    const c = parseInt(document.getElementById(`inq-${key}-count-${propId}`)?.value)||0;
+    const v = parseInt(document.getElementById(`inq-${key}-views-${propId}`)?.value)||0;
+    p.inquiries[key] = { count: c, views: v };
+  });
+  save(); toast('反響データを保存しました ✅', 'ok');
+}
+
+/* ── Showing record ── */
+function addShowing(propId) {
+  const p = D.properties.find(x => x.id === propId); if (!p) return;
+  showModal(`
+    <div class="modal">
+      <div class="modal-hd"><div class="modal-title">内見記録を追加</div><span class="modal-close" onclick="closeModal()">✕</span></div>
+      <div class="modal-body">
+        <div class="form-group"><label>内見日</label><input type="text" id="sh-date" placeholder="例：2025年7月20日" value="${new Date().toLocaleDateString('ja-JP')}"></div>
+        <div class="form-group"><label>来客者名</label><input type="text" id="sh-name" placeholder="例：山田様"></div>
+        <div class="form-group"><label>結果</label>
+          <select id="sh-result">
+            <option value="">選択なし</option>
+            <option value="検討中">検討中</option>
+            <option value="前向き">前向き</option>
+            <option value="見送り">見送り</option>
+            <option value="申込">申込</option>
+          </select>
+        </div>
+        <div class="form-group"><label>メモ</label><textarea id="sh-memo" placeholder="感想・コメント…"></textarea></div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="saveShowing('${propId}')">保存</button>
+      </div>
+    </div>`);
+}
+function saveShowing(propId) {
+  const p = D.properties.find(x => x.id === propId); if (!p) return;
+  if (!p.showings) p.showings = [];
+  p.showings.push({
+    id: Date.now().toString(36),
+    date: document.getElementById('sh-date').value,
+    name: document.getElementById('sh-name').value,
+    result: document.getElementById('sh-result').value,
+    memo: document.getElementById('sh-memo').value,
+  });
+  save(); closeModal(); toast('内見記録を追加しました ✅', 'ok');
+  showPropDetail(propId);
+}
+
+/* ── Agent report ── */
+function addAgentReport(propId) {
+  const p = D.properties.find(x => x.id === propId); if (!p) return;
+  showModal(`
+    <div class="modal">
+      <div class="modal-hd"><div class="modal-title">活動報告を追加</div><span class="modal-close" onclick="closeModal()">✕</span></div>
+      <div class="modal-body">
+        <div class="form-group"><label>日付</label><input type="text" id="rp-date" value="${new Date().toLocaleDateString('ja-JP')}"></div>
+        <div class="form-group"><label>担当者名</label><input type="text" id="rp-author" placeholder="例：田中太郎"></div>
+        <div class="form-group"><label>報告内容</label><textarea id="rp-content" style="min-height:120px" placeholder="販売活動の状況、問い合わせ状況、改善案など…"></textarea></div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="saveAgentReport('${propId}')">保存</button>
+      </div>
+    </div>`);
+}
+function saveAgentReport(propId) {
+  const p = D.properties.find(x => x.id === propId); if (!p) return;
+  if (!p.agentReports) p.agentReports = [];
+  p.agentReports.push({
+    id: Date.now().toString(36),
+    date: document.getElementById('rp-date').value,
+    author: document.getElementById('rp-author').value,
+    content: document.getElementById('rp-content').value,
+  });
+  save(); closeModal(); toast('活動報告を保存しました ✅', 'ok');
+  showPropDetail(propId);
+}
+
 async function delProp(id) {
   if (!confirm('この物件を削除しますか？')) return;
   D.properties = D.properties.filter(p => p.id !== id);
@@ -1581,13 +1918,25 @@ async function delProp(id) {
   save(); closeModal(); toast('物件を削除しました', 'ok'); renderProps();
 }
 
+/* ── Status options per category ── */
+const CAT_STATUSES = {
+  '売買':  ['査定中','媒介契約','販売活動中','申込中','成約','見送り'],
+  '賃貸':  ['募集中','申込中','契約済','入居中','退去予定','空室'],
+  '収益':  ['売却検討','販売活動中','申込中','成約','見送り'],
+  '':      ['未提案','検討中','申込中','成約','見送り'],
+};
+function getStatusOptions(category, currentStatus) {
+  const list = CAT_STATUSES[category] || CAT_STATUSES[''];
+  return list.map(s => `<option value="${s}" ${currentStatus===s?'selected':''}>${s}</option>`).join('');
+}
+
 /* ── Property Form ── */
 function showPropModal(editId = '') {
   _pendingFile = null;
   const p = editId ? D.properties.find(x => x.id === editId) : null;
-  const STATUSES   = ['未提案','検討中','申込中','成約','見送り'];
-  const TYPES      = ['マンション','一戸建て','土地','店舗','その他'];
-  const STRUCTURES = ['鉄筋コンクリート','鉄骨造','木造','その他'];
+  const category   = p?.category || '';
+  const TYPES      = ['マンション','一戸建て','土地','店舗','アパート','収益ビル','その他'];
+  const STRUCTURES = ['鉄筋コンクリート','鉄骨造','木造','軽量鉄骨','その他'];
   const cfg        = getCfg();
 
   const agOpts = (key) => D.agents.map(a =>
@@ -1650,16 +1999,34 @@ function showPropModal(editId = '') {
               </div>
               <div class="form-row">
                 <div class="form-group">
+                  <label>カテゴリ</label>
+                  <select id="p-category" onchange="updateStatusOpts()">
+                    <option value="">未設定</option>
+                    <option value="売買" ${category==='売買'?'selected':''}>売買</option>
+                    <option value="賃貸" ${category==='賃貸'?'selected':''}>賃貸</option>
+                    <option value="収益" ${category==='収益'?'selected':''}>収益物件</option>
+                  </select>
+                </div>
+                <div class="form-group">
                   <label>種別</label>
                   <select id="p-type">
                     <option value="">選択</option>
                     ${TYPES.map(t=>`<option value="${t}" ${p?.type===t?'selected':''}>${t}</option>`).join('')}
                   </select>
                 </div>
+              </div>
+              <div class="form-row">
                 <div class="form-group">
                   <label>ステータス</label>
                   <select id="p-status">
-                    ${STATUSES.map(s=>`<option value="${s}" ${(p?.status||'未提案')===s?'selected':''}>${s}</option>`).join('')}
+                    ${getStatusOptions(category, p?.status||'')}
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>HP公開</label>
+                  <select id="p-is-public">
+                    <option value="0" ${!p?.isPublic?'selected':''}>非公開（社内のみ）</option>
+                    <option value="1" ${p?.isPublic?'selected':''}>公開（HP表示）</option>
                   </select>
                 </div>
               </div>
@@ -1807,13 +2174,36 @@ function showPropModal(editId = '') {
                 : `<div style="font-size:11px;color:var(--text-muted)">顧客が未登録です。先に顧客管理から登録してください。</div>`}
             </div>
 
+            <!-- HP Description -->
+            <div class="form-sec" id="hp-sec" style="${p?.isPublic?'':'display:none'}">
+              <div class="form-sec-title">🌐 HP表示用テキスト</div>
+              <div class="form-group">
+                <textarea id="p-hp-desc" placeholder="HPに表示する物件紹介文…" style="min-height:60px">${esc(p?.hpDescription||'')}</textarea>
+              </div>
+            </div>
             <!-- Notes -->
             <div class="form-sec">
-              <div class="form-sec-title">📝 メモ</div>
+              <div class="form-sec-title">📝 メモ（社内のみ）</div>
               <div class="form-group">
                 <textarea id="p-notes" placeholder="特記事項・所感など…">${esc(p?.notes||'')}</textarea>
               </div>
             </div>
+            <!-- Price History -->
+            ${p && (p.priceHistory||[]).length > 0 ? `
+            <div class="form-sec">
+              <div class="form-sec-title">💹 価格変更履歴</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">保存時に価格が変わった場合、自動記録されます</div>
+              ${(p.priceHistory||[]).slice().reverse().map((h,i,arr) => {
+                const prev = arr[i+1];
+                const delta = prev ? h.price - prev.price : 0;
+                const dStr = delta !== 0 ? ` <span class="ph-delta ${delta<0?'down':'up'}">${delta<0?'▼':'▲'}${Math.abs(delta).toLocaleString()}万</span>` : '';
+                return `<div class="ph-row">
+                  <span class="ph-date">${h.date}</span>
+                  <span class="ph-price">${parseInt(h.price).toLocaleString()}万円</span>${dStr}
+                  ${h.note?`<span style="color:var(--text-muted);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.note)}</span>`:''}
+                </div>`;
+              }).join('')}
+            </div>` : ''}
           </div>
         </div>
       </div>
@@ -1827,6 +2217,20 @@ function showPropModal(editId = '') {
     </div>`);
 
   if (p) showExistingPDFBadge(p.id);
+
+  // Wire up HP toggle
+  const hpSel = document.getElementById('p-is-public');
+  if (hpSel) hpSel.addEventListener('change', () => {
+    const sec = document.getElementById('hp-sec');
+    if (sec) sec.style.display = hpSel.value === '1' ? '' : 'none';
+  });
+}
+
+function updateStatusOpts() {
+  const cat = document.getElementById('p-category')?.value || '';
+  const sel = document.getElementById('p-status');
+  if (!sel) return;
+  sel.innerHTML = getStatusOptions(cat, sel.value);
 }
 
 async function showExistingPDFBadge(id) {
@@ -1903,14 +2307,18 @@ async function setPending(f) {
 async function saveProp(editId) {
   const name = document.getElementById('p-name').value.trim();
   if (!name) { toast('物件名を入力してください', 'err'); return; }
-  const custIds = [...document.querySelectorAll('[name=cids]:checked')].map(el => el.value);
+  const custIds  = [...document.querySelectorAll('[name=cids]:checked')].map(el => el.value);
+  const newPrice = parseInt(document.getElementById('p-price').value) || 0;
+  const isPublic = document.getElementById('p-is-public')?.value === '1';
+
   const prop = {
     id: editId || uid(), name,
-    type:         document.getElementById('p-type').value,
-    status:       document.getElementById('p-status').value,
-    location:     document.getElementById('p-loc').value.trim(),
-    price:        document.getElementById('p-price').value,
-    layout:       document.getElementById('p-layout').value.trim(),
+    category:      document.getElementById('p-category')?.value || '',
+    type:          document.getElementById('p-type').value,
+    status:        document.getElementById('p-status').value,
+    location:      document.getElementById('p-loc').value.trim(),
+    price:         newPrice,
+    layout:        document.getElementById('p-layout').value.trim(),
     landArea:      document.getElementById('p-land-area').value,
     buildArea:     document.getElementById('p-build-area').value,
     cityPlan:      document.getElementById('p-city-plan').value,
@@ -1920,18 +2328,46 @@ async function saveProp(editId) {
     road:          document.getElementById('p-road').value.trim(),
     setback:       document.getElementById('p-setback').value,
     age:           document.getElementById('p-age').value,
-    structure:    document.getElementById('p-struct').value,
-    extra:        document.getElementById('p-extra').value.trim(),
-    sellerId:     document.getElementById('p-seller').value,
-    brokerId:     document.getElementById('p-broker').value,
-    contactName:  document.getElementById('p-cname').value.trim(),
-    contactPhone: document.getElementById('p-cphone').value.trim(),
-    custIds, notes: document.getElementById('p-notes').value.trim(),
+    structure:     document.getElementById('p-struct').value,
+    extra:         document.getElementById('p-extra').value.trim(),
+    sellerId:      document.getElementById('p-seller').value,
+    brokerId:      document.getElementById('p-broker').value,
+    contactName:   document.getElementById('p-cname').value.trim(),
+    contactPhone:  document.getElementById('p-cphone').value.trim(),
+    isPublic,
+    hpDescription: document.getElementById('p-hp-desc')?.value.trim() || '',
+    custIds,
+    notes:         document.getElementById('p-notes').value.trim(),
     updAt: Date.now()
   };
+
   const ex = D.properties.find(p => p.id === prop.id);
-  if (ex) { prop.ts = ex.ts; Object.assign(ex, prop); }
-  else     { prop.ts = Date.now(); D.properties.push(prop); }
+  if (ex) {
+    // Price history tracking
+    const oldPrice = parseInt(ex.price) || 0;
+    const history  = ex.priceHistory || [];
+    if (!editId || (oldPrice !== newPrice && newPrice > 0)) {
+      if (!editId && newPrice > 0) {
+        // New property: record initial price
+        history.push({ price: newPrice, date: new Date().toLocaleDateString('ja-JP'), note: '初回登録' });
+      } else if (editId && oldPrice !== newPrice && newPrice > 0) {
+        history.push({ price: newPrice, date: new Date().toLocaleDateString('ja-JP'), note: '' });
+      }
+    }
+    prop.priceHistory = history;
+    prop.ts = ex.ts;
+    prop.docMeta = ex.docMeta;
+    Object.assign(ex, prop);
+  } else {
+    prop.ts = Date.now();
+    // Record initial price for new properties
+    if (newPrice > 0) {
+      prop.priceHistory = [{ price: newPrice, date: new Date().toLocaleDateString('ja-JP'), note: '初回登録' }];
+    } else {
+      prop.priceHistory = [];
+    }
+    D.properties.push(prop);
+  }
 
   if (_pendingFile) {
     await dbSave(prop.id, _pendingFile.name, await _pendingFile.arrayBuffer());
@@ -1947,27 +2383,57 @@ async function saveProp(editId) {
 function renderCusts() {
   let list = D.customers.filter(c => {
     if (!q) return true;
-    return `${c.name} ${c.phone} ${c.email} ${c.notes}`.toLowerCase().includes(q);
+    return `${c.name} ${c.kana||''} ${c.phone} ${c.email} ${c.address||''} ${c.agent||''} ${c.notes}`.toLowerCase().includes(q);
   }).sort((a,b)=>(b.ts||0)-(a.ts||0));
 
-  let h = `<div class="tbl-wrap"><table>
+  const RANK_COLOR = {A:'#c53030',B:'#c05621',C:'#276749',D:'#2b6cb0'};
+
+  let h = `
+    <!-- ── アクションバー ── -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-primary btn-sm" onclick="showCustModal()">＋ 新規登録</button>
+      <button class="btn btn-sm" onclick="showIerabuCustChrome()"
+        style="background:linear-gradient(135deg,#1a3a5c,#2c5282);color:#fff">🔗 いえらぶ Chrome連携</button>
+      <button class="btn btn-secondary btn-sm" onclick="showIerabuCustCsv()">📥 いえらぶCSV取込</button>
+      <span style="font-size:11px;color:var(--text-muted);margin-left:auto">${list.length}件</span>
+    </div>
+    <div class="tbl-wrap"><table>
     <thead><tr>
-      <th>顧客名</th><th>電話番号</th><th>メール</th>
-      <th>提案件数</th><th>メモ</th><th>登録日</th><th></th>
+      <th>源泉</th><th>顧客名</th><th>電話番号</th><th>メール</th>
+      <th>担当者</th><th>ランク</th><th>提案件数</th><th>登録日</th><th></th>
     </tr></thead><tbody>`;
 
   if (!list.length) {
-    h += `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">顧客が登録されていません</td></tr>`;
+    h += `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">
+      <div style="font-size:32px;margin-bottom:8px">👤</div>
+      顧客が登録されていません<br>
+      <span style="font-size:12px">「＋ 新規登録」または「いえらぶ Chrome連携」から追加してください</span>
+    </td></tr>`;
   }
   list.forEach(c => {
-    const cnt = D.properties.filter(p => p.custIds?.includes(c.id)).length;
-    h += `<tr onclick="filterByCust('${c.id}')">
-      <td><strong>${esc(c.name)}</strong></td>
-      <td>${esc(c.phone||'-')}</td>
-      <td style="font-size:11px">${esc(c.email||'-')}</td>
+    const cnt  = D.properties.filter(p => p.custIds?.includes(c.id)).length;
+    const src  = c.source === 'ierabu'
+      ? `<span style="background:#1a3a5c;color:#fff;font-size:9px;padding:2px 5px;border-radius:3px;white-space:nowrap">いえらぶ</span>`
+      : `<span style="background:var(--border);color:var(--text-muted);font-size:9px;padding:2px 5px;border-radius:3px">手動</span>`;
+    const rankClr = RANK_COLOR[c.rank] || '#718096';
+    const rank = c.rank
+      ? `<span style="background:${rankClr};color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px">${esc(c.rank)}</span>`
+      : '<span style="color:var(--text-muted);font-size:11px">-</span>';
+    h += `<tr onclick="filterByCust('${c.id}')" style="cursor:pointer">
+      <td>${src}</td>
+      <td>
+        <strong>${esc(c.name)}</strong>
+        ${c.kana ? `<div style="font-size:10px;color:var(--text-muted)">${esc(c.kana)}</div>` : ''}
+      </td>
+      <td style="font-size:12px;white-space:nowrap">
+        ${esc(c.phone||'-')}
+        ${c.phone2 ? `<div style="font-size:10px;color:var(--text-muted)">${esc(c.phone2)}</div>` : ''}
+      </td>
+      <td style="font-size:11px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.email||'-')}</td>
+      <td style="font-size:12px">${esc(c.agent||'-')}</td>
+      <td>${rank}</td>
       <td><span style="background:var(--primary);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px">${cnt}件</span></td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--text-muted)">${esc(c.notes||'-')}</td>
-      <td style="font-size:11px;color:var(--text-muted)">${c.ts?new Date(c.ts).toLocaleDateString('ja-JP'):'-'}</td>
+      <td style="font-size:11px;color:var(--text-muted);white-space:nowrap">${c.ts?new Date(c.ts).toLocaleDateString('ja-JP'):'-'}</td>
       <td onclick="event.stopPropagation()">
         <button class="btn btn-secondary btn-xs" onclick="showCustModal('${c.id}')">編集</button>
         <button class="btn btn-danger btn-xs" onclick="delCust('${c.id}')">削除</button>
@@ -1982,29 +2448,59 @@ function filterByCust(id) { pf.custId = id; nav('props'); }
 function showCustModal(editId = '') {
   const c = editId ? D.customers.find(x => x.id === editId) : null;
   showModal(`
-    <div class="modal">
+    <div class="modal" style="max-width:560px">
       <div class="modal-hd">
         <div class="modal-title">${c ? '顧客を編集' : '顧客を登録'}</div>
         <span class="modal-close" onclick="closeModal()">✕</span>
       </div>
       <div class="modal-body">
-        <div class="form-group">
-          <label>顧客名 <span class="req">*</span></label>
-          <input type="text" id="c-name" value="${ea(c?.name||'')}" placeholder="例：田中 太郎">
+        <div class="form-row">
+          <div class="form-group" style="flex:2">
+            <label>顧客名 <span class="req">*</span></label>
+            <input type="text" id="c-name" value="${ea(c?.name||'')}" placeholder="例：田中 太郎">
+          </div>
+          <div class="form-group" style="flex:2">
+            <label>フリガナ</label>
+            <input type="text" id="c-kana" value="${ea(c?.kana||'')}" placeholder="タナカ タロウ">
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>ランク</label>
+            <select id="c-rank">
+              ${['','A','B','C','D'].map(r=>`<option value="${r}" ${(c?.rank||'')===r?'selected':''}>${r||'なし'}</option>`).join('')}
+            </select>
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>電話番号</label>
+            <label>電話番号①</label>
             <input type="tel" id="c-phone" value="${ea(c?.phone||'')}" placeholder="000-0000-0000">
           </div>
           <div class="form-group">
-            <label>メールアドレス</label>
-            <input type="email" id="c-email" value="${ea(c?.email||'')}" placeholder="example@email.com">
+            <label>電話番号②</label>
+            <input type="tel" id="c-phone2" value="${ea(c?.phone2||'')}" placeholder="000-0000-0000">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>メールアドレス</label>
+          <input type="email" id="c-email" value="${ea(c?.email||'')}" placeholder="example@email.com">
+        </div>
+        <div class="form-group">
+          <label>住所</label>
+          <input type="text" id="c-address" value="${ea(c?.address||'')}" placeholder="神奈川県横浜市…">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>担当者名</label>
+            <input type="text" id="c-agent" value="${ea(c?.agent||'')}" placeholder="担当スタッフ名">
+          </div>
+          <div class="form-group">
+            <label>いえらぶ顧客ID</label>
+            <input type="text" id="c-ierabu-id" value="${ea(c?.ierabuId||'')}" placeholder="自動入力">
           </div>
         </div>
         <div class="form-group">
           <label>ご要望・条件・備考</label>
-          <textarea id="c-notes" placeholder="希望エリア、予算、間取り条件、備考など…">${esc(c?.notes||'')}</textarea>
+          <textarea id="c-notes" rows="3" placeholder="希望エリア、予算、間取り条件、備考など…">${esc(c?.notes||'')}</textarea>
         </div>
       </div>
       <div class="modal-ft">
@@ -2020,14 +2516,152 @@ function saveCust(editId) {
   if (!name) { toast('顧客名を入力してください', 'err'); return; }
   const cust = {
     id: editId || uid(), name,
-    phone: document.getElementById('c-phone').value.trim(),
-    email: document.getElementById('c-email').value.trim(),
-    notes: document.getElementById('c-notes').value.trim()
+    kana:     document.getElementById('c-kana').value.trim(),
+    phone:    document.getElementById('c-phone').value.trim(),
+    phone2:   document.getElementById('c-phone2').value.trim(),
+    email:    document.getElementById('c-email').value.trim(),
+    address:  document.getElementById('c-address').value.trim(),
+    agent:    document.getElementById('c-agent').value.trim(),
+    rank:     document.getElementById('c-rank').value,
+    ierabuId: document.getElementById('c-ierabu-id').value.trim(),
+    notes:    document.getElementById('c-notes').value.trim(),
   };
   const ex = D.customers.find(c => c.id === cust.id);
-  if (ex) { cust.ts = ex.ts; Object.assign(ex, cust); }
-  else     { cust.ts = Date.now(); D.customers.push(cust); }
+  if (ex) { cust.ts = ex.ts; cust.source = ex.source; Object.assign(ex, cust); }
+  else     { cust.ts = Date.now(); cust.source = cust.ierabuId ? 'ierabu' : 'manual'; D.customers.push(cust); }
   save(); closeModal(); toast(`顧客を${editId ? '更新' : '登録'}しました`, 'ok'); renderCusts();
+}
+
+/* ── いえらぶCLOUD Chrome連携 ── */
+function showIerabuCustChrome() {
+  showModal(`
+    <div class="modal" style="max-width:520px">
+      <div class="modal-hd">
+        <div class="modal-title">🔗 いえらぶCLOUD Chrome連携</div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;padding:14px;margin-bottom:14px;font-size:13px">
+          <div style="font-weight:700;color:#2b6cb0;margin-bottom:6px">📌 使い方</div>
+          <ol style="margin:0;padding-left:18px;line-height:1.9;color:#2d3748">
+            <li>Chrome でいえらぶCLOUDにログインしてください</li>
+            <li>顧客一覧ページを開いてください</li>
+            <li>取り込みたい顧客が表示された状態にしてください<br><span style="font-size:11px;color:#718096">（絞り込み・ページ選択も有効）</span></li>
+            <li>このウィンドウを閉じて、Claudeに<br>
+              <strong style="background:#fff;border:1px solid #bee3f8;padding:2px 8px;border-radius:4px;font-size:12px">「いえらぶの顧客を取り込んで」</strong>
+              と話しかけてください</li>
+          </ol>
+        </div>
+        <div style="background:#fffaf0;border:1px solid #fbd38d;border-radius:8px;padding:10px 14px;font-size:12px;color:#744210">
+          ⚠️ Chromeの拡張機能「Claude in Chrome」がインストール済みで、いえらぶCLOUDのサイトに権限付与されている必要があります
+        </div>
+        <div style="margin-top:14px;font-size:12px;color:var(--text-muted)">
+          取込み項目：顧客名・フリガナ・電話番号・メール・住所・担当者・ランク
+        </div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-primary" onclick="closeModal()">確認しました</button>
+      </div>
+    </div>`);
+}
+
+/* ── いえらぶCSV取込 ── */
+function showIerabuCustCsv() {
+  showModal(`
+    <div class="modal" style="max-width:560px">
+      <div class="modal-hd">
+        <div class="modal-title">📥 いえらぶCSV取込</div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">
+          いえらぶCLOUDの顧客一覧からエクスポートしたCSVを貼り付けてください。<br>
+          対応列：<code>顧客名/氏名, フリガナ, 電話番号, メール, 住所, 担当者, ランク, 備考</code>
+        </div>
+        <textarea id="ierabu-csv-input" style="width:100%;min-height:180px;font-family:monospace;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:8px"
+          placeholder="いえらぶCLOUDの顧客CSVをここに貼り付け…&#10;&#10;例：&#10;顧客名,フリガナ,電話番号,メールアドレス,住所,担当者名,ランク&#10;田中 太郎,タナカ タロウ,090-1234-5678,tanaka@example.com,横浜市港南区,山田花子,A"></textarea>
+        <div id="ierabu-csv-preview" style="margin-top:8px;font-size:12px;color:var(--text-muted)"></div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="executeIerabuCsvImport()">取込み実行</button>
+      </div>
+    </div>`);
+  document.getElementById('ierabu-csv-input').addEventListener('input', previewIerabuCsv);
+}
+function previewIerabuCsv() {
+  const raw = document.getElementById('ierabu-csv-input').value.trim();
+  if (!raw) { document.getElementById('ierabu-csv-preview').textContent = ''; return; }
+  const rows = raw.split('\n').filter(r=>r.trim());
+  document.getElementById('ierabu-csv-preview').textContent = `${rows.length}行を検出（ヘッダー含む）`;
+}
+function executeIerabuCsvImport() {
+  const raw = document.getElementById('ierabu-csv-input').value.trim();
+  if (!raw) { toast('CSVを入力してください', 'err'); return; }
+  const rows = raw.split('\n').map(r => r.split(',').map(c => c.replace(/^"|"$/g,'').trim()));
+  if (rows.length < 2) { toast('データ行がありません', 'err'); return; }
+  const header = rows[0].map(h => h.toLowerCase());
+  // 列インデックスを特定
+  const col = k => {
+    const aliases = {
+      name:    ['顧客名','氏名','名前','name'],
+      kana:    ['フリガナ','ふりがな','kana','yomi'],
+      phone:   ['電話番号','電話','tel','phone'],
+      phone2:  ['電話番号2','電話2','携帯','mobile'],
+      email:   ['メール','メールアドレス','mail','email'],
+      address: ['住所','所在地','address'],
+      agent:   ['担当者','担当','担当者名','agent'],
+      rank:    ['ランク','rank','優先度'],
+      notes:   ['備考','メモ','notes','remark'],
+      id:      ['顧客id','id','顧客番号','no'],
+    };
+    for (const a of (aliases[k]||[])) {
+      const i = header.findIndex(h => h.includes(a));
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+  const records = rows.slice(1).filter(r => r.some(c => c)).map(r => ({
+    name:     r[col('name')]   || '',
+    kana:     r[col('kana')]   || '',
+    phone:    r[col('phone')]  || '',
+    phone2:   r[col('phone2')] || '',
+    email:    r[col('email')]  || '',
+    address:  r[col('address')]|| '',
+    agent:    r[col('agent')]  || '',
+    rank:     r[col('rank')]   || '',
+    notes:    r[col('notes')]  || '',
+    ierabuId: r[col('id')]     || '',
+  })).filter(r => r.name);
+  if (!records.length) { toast('有効なデータが見つかりません', 'err'); return; }
+  closeModal();
+  importIerabuCustomers(records);
+}
+
+/* ── いえらぶ顧客 取込み共通関数（Chrome連携・CSV共通） ── */
+function importIerabuCustomers(records) {
+  if (!Array.isArray(records) || !records.length) { toast('取込データがありません', 'err'); return; }
+  let added = 0, updated = 0;
+  records.forEach(r => {
+    if (!r.name) return;
+    // 既存チェック: いえらぶIDまたは氏名+電話が一致
+    const existing = D.customers.find(c =>
+      (r.ierabuId && c.ierabuId && c.ierabuId === r.ierabuId) ||
+      (c.name === r.name && c.phone && c.phone === r.phone)
+    );
+    if (existing) {
+      const ts = existing.ts;
+      Object.assign(existing, r, { id: existing.id, ts, source: 'ierabu', syncedAt: Date.now() });
+      updated++;
+    } else {
+      D.customers.push({ id: uid(), ts: Date.now(), source: 'ierabu', syncedAt: Date.now(), ...r });
+      added++;
+    }
+  });
+  save();
+  document.getElementById('nb-custs').textContent = D.customers.length;
+  toast(`いえらぶ顧客 ${added}件追加 / ${updated}件更新 ✅`, 'ok');
+  renderCusts();
 }
 function delCust(id) {
   if (!confirm('この顧客を削除しますか？\n物件との紐付けも解除されます。')) return;
@@ -2153,12 +2787,1540 @@ function delAgent(id) {
 }
 
 /* ══════════════════════════════════════════════
+   MARKET DATA（市場データ取込・分析）
+══════════════════════════════════════════════ */
+function calcMktUnit(m) {
+  // ㎡単価・坪単価を計算
+  const price = parseFloat(m.price) || 0;
+  const area  = parseFloat(m.buildArea) || parseFloat(m.landArea) || 0;
+  if (price > 0 && area > 0) {
+    m.pricePerSqm   = price / area;            // 万円/㎡
+    m.pricePerTsubo = price / (area / 3.306);  // 万円/坪
+  }
+  return m;
+}
+
+function renderMarket() {
+  const MD = D.marketData || [];
+
+  // ── 種別フィルター適用 ──
+  const typeFiltered = mktType ? MD.filter(m => normalizeType(m.type) === mktType) : MD;
+
+  // ── 検索クエリ適用（一覧用） ──
+  const list = typeFiltered.filter(m => {
+    if (!q) return true;
+    return `${m.location} ${m.type} ${m.layout} ${m.source}`.toLowerCase().includes(q);
+  }).sort((a,b) => (b.importedAt||0)-(a.importedAt||0));
+
+  // ── サマリー統計（種別フィルター後） ──
+  const totalCount = MD.length;
+  const priced     = typeFiltered.filter(m => m.price);
+  const avgPrice   = priced.length ? priced.reduce((s,m) => s + parseFloat(m.price), 0) / priced.length : 0;
+  const sqmed      = typeFiltered.filter(m => m.pricePerSqm);
+  const avgSqm     = sqmed.length  ? sqmed.reduce((s,m) => s + m.pricePerSqm, 0) / sqmed.length : 0;
+  const contracted = typeFiltered.filter(m => m.status === '成約').length;
+
+  // ── 種別ボタン定義 ──
+  const TYPE_BTNS = [
+    {key:'', label:'全て', icon:''},
+    {key:'一戸建て', label:'一戸建て', icon:'🏠'},
+    {key:'マンション', label:'マンション', icon:'🏢'},
+    {key:'土地', label:'土地', icon:'🌿'},
+    {key:'アパート', label:'アパート', icon:'🏘'},
+  ];
+
+  document.getElementById('cnt').innerHTML = `
+    <div class="mkt-tabs">
+      <div class="mkt-tab ${mktTab==='list'?'active':''}" onclick="mktTab='list';renderMarket()">📋 データ一覧</div>
+      <div class="mkt-tab ${mktTab==='analysis'?'active':''}" onclick="mktTab='analysis';renderMarket()">📈 相場分析</div>
+      <div class="mkt-tab ${mktTab==='map'?'active':''}" onclick="mktTab='map';renderMarket()">🗺 マップ</div>
+    </div>
+
+    <div class="mkt-stat-row">
+      <div class="mkt-stat"><div class="ms-label">取込件数</div><div class="ms-val" style="color:var(--primary)">${totalCount.toLocaleString()}</div><div class="ms-sub">件</div></div>
+      <div class="mkt-stat"><div class="ms-label">平均価格</div><div class="ms-val" style="color:var(--primary)">${avgPrice ? Math.round(avgPrice).toLocaleString() : '-'}</div><div class="ms-sub">万円</div></div>
+      <div class="mkt-stat"><div class="ms-label">平均㎡単価</div><div class="ms-val" style="color:#553c9a">${avgSqm ? avgSqm.toFixed(1) : '-'}</div><div class="ms-sub">万円/㎡</div></div>
+      <div class="mkt-stat"><div class="ms-label">成約件数</div><div class="ms-val" style="color:var(--success)">${contracted.toLocaleString()}</div><div class="ms-sub">件</div></div>
+      <div class="mkt-stat"><div class="ms-label">自社物件</div><div class="ms-val" style="color:var(--accent)">${D.properties.length}</div><div class="ms-sub">件登録中</div></div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-primary btn-sm" onclick="showMarketEntry()">＋ 手動入力</button>
+      <button class="btn btn-sm" onclick="showMlitImport()" style="background:#744210;color:#fff">🏛 国交省データ</button>
+      <button class="btn btn-accent btn-sm" onclick="showReinsChrome()" style="background:#2c5282">🔗 レインズ Chrome連携</button>
+      <button class="btn btn-secondary btn-sm" onclick="showCSVImport()">📥 CSV取込</button>
+      <button class="btn btn-secondary btn-sm" onclick="showSuumoImport()">📋 テキスト貼付</button>
+      ${MD.length ? `<button class="btn btn-danger btn-sm" onclick="clearMarketData()">🗑 全データ削除</button>` : ''}
+    </div>
+
+    <!-- ── 種別フィルター（タブ共通） ── -->
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:14px;flex-wrap:wrap;background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:9px 12px">
+      <span style="font-size:11px;color:var(--text-muted);font-weight:700;white-space:nowrap;margin-right:2px">種別：</span>
+      ${TYPE_BTNS.map(({key, label, icon}) => {
+        const cnt = key ? MD.filter(m => normalizeType(m.type) === key).length : MD.length;
+        const active = mktType === key;
+        return `<button onclick="mktType='${key}';mktPage=0;renderMarket()"
+          style="display:inline-flex;align-items:center;gap:4px;padding:5px 13px;border-radius:20px;
+          border:1px solid ${active?'var(--primary)':'var(--border)'};font-size:12px;font-weight:600;
+          cursor:pointer;transition:all .15s;white-space:nowrap;
+          background:${active?'var(--primary)':'#fff'};color:${active?'#fff':'var(--text)'}"
+          >${icon?icon+' ':''}${esc(label)}<span style="font-size:10px;opacity:.65;margin-left:3px">${cnt.toLocaleString()}</span></button>`;
+      }).join('')}
+    </div>
+
+    ${mktTab === 'list'
+      ? renderMarketList(list)
+      : mktTab === 'analysis'
+        ? renderMarketAnalysis(typeFiltered)
+        : '<div id="map-outer"><div id="market-map"></div><div class="geocode-status" id="geo-status"></div><div class="map-legend" id="map-legend"></div></div>'}
+  `;
+  if (mktTab === 'map') setTimeout(() => initMarketMap(typeFiltered), 50);
+}
+
+function renderMarketList(list) {
+  if (!list.length) return `<div class="empty">
+    <div class="empty-icon">📊</div>
+    <div class="empty-title">市場データがありません</div>
+    <div class="empty-desc">「レインズCSV取込」または「手動入力」からデータを登録してください</div>
+  </div>`;
+
+  // ── ページネーション計算 ──
+  const total     = list.length;
+  const pageCount = Math.ceil(total / MKT_PAGE_SIZE);
+  if (mktPage >= pageCount) mktPage = pageCount - 1;
+  if (mktPage < 0) mktPage = 0;
+  const pageList  = list.slice(mktPage * MKT_PAGE_SIZE, (mktPage + 1) * MKT_PAGE_SIZE);
+  const from      = mktPage * MKT_PAGE_SIZE + 1;
+  const to        = Math.min((mktPage + 1) * MKT_PAGE_SIZE, total);
+
+  function pager(id) {
+    if (pageCount <= 1) return '';
+    // ページ番号ボタン（最大7個表示）
+    const range = [];
+    const delta = 3;
+    for (let i = 0; i < pageCount; i++) {
+      if (i === 0 || i === pageCount-1 || (i >= mktPage-delta && i <= mktPage+delta)) range.push(i);
+      else if (range[range.length-1] !== '…') range.push('…');
+    }
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px;flex-wrap:wrap;gap:6px">
+      <span style="font-size:12px;color:var(--text-muted)">${from.toLocaleString()}〜${to.toLocaleString()} 件 / 全 ${total.toLocaleString()} 件</span>
+      <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-xs" ${mktPage===0?'disabled':''} onclick="mktPage=0;renderMarket()" title="最初">«</button>
+        <button class="btn btn-secondary btn-xs" ${mktPage===0?'disabled':''} onclick="mktPage--;renderMarket()" title="前へ">‹ 前</button>
+        ${range.map(p => p==='…'
+          ? `<span style="padding:0 3px;color:var(--text-muted)">…</span>`
+          : `<button onclick="mktPage=${p};renderMarket()"
+              style="padding:4px 9px;border-radius:5px;border:1px solid ${p===mktPage?'var(--primary)':'var(--border)'};
+              font-size:12px;font-weight:${p===mktPage?'700':'400'};cursor:pointer;
+              background:${p===mktPage?'var(--primary)':'#fff'};color:${p===mktPage?'#fff':'var(--text)'}">${p+1}</button>`
+        ).join('')}
+        <button class="btn btn-secondary btn-xs" ${mktPage>=pageCount-1?'disabled':''} onclick="mktPage++;renderMarket()" title="次へ">次 ›</button>
+        <button class="btn btn-secondary btn-xs" ${mktPage>=pageCount-1?'disabled':''} onclick="mktPage=${pageCount-1};renderMarket()" title="最後">»</button>
+      </div>
+    </div>`;
+  }
+
+  const srcMap = {reins:'レインズ',suumo:'SUUMO',homes:"HOME'S",manual:'手動入力',mlit:'国交省'};
+  const srcClr = src => ({reins:'badge-src-reins',suumo:'badge-src-suumo',homes:'badge-src-homes',manual:'badge-src-manual',mlit:'badge-src-mlit'}[src]||'badge-src-manual');
+
+  return `
+    ${pager('top')}
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>情報源</th><th>所在地</th><th>種別</th><th>間取り</th>
+        <th>面積</th><th>価格</th><th>㎡単価</th><th>坪単価</th>
+        <th>ステータス</th><th>成約日/掲載日</th><th></th>
+      </tr></thead><tbody>
+      ${pageList.map(m => {
+        const sqm   = m.pricePerSqm   ? m.pricePerSqm.toFixed(1)+'万' : '-';
+        const tsubo = m.pricePerTsubo ? m.pricePerTsubo.toFixed(1)+'万' : '-';
+        const area  = m.buildArea ? m.buildArea+'㎡' : m.landArea ? m.landArea+'㎡(土)' : '-';
+        return `<tr>
+          <td><span class="badge ${srcClr(m.source)}">${srcMap[m.source]||m.source||'?'}</span></td>
+          <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(m.location||'-')}</td>
+          <td style="font-size:11px">${esc(normalizeType(m.type)||'-')}</td>
+          <td style="font-size:11px">${esc(m.layout||'-')}</td>
+          <td style="font-size:11px;text-align:right">${area}</td>
+          <td style="font-weight:700;white-space:nowrap">${m.price?parseInt(m.price).toLocaleString()+'万':'-'}</td>
+          <td style="font-size:11px;text-align:right;color:#553c9a">${sqm}</td>
+          <td style="font-size:11px;text-align:right;color:#2c5282">${tsubo}</td>
+          <td>${m.status?`<span class="badge badge-${m.status==='成約'?'成約':'検討中'}">${esc(m.status)}</span>`:'-'}</td>
+          <td style="font-size:10px;color:var(--text-muted)">${esc(m.contractDate||m.importDate||'-')}</td>
+          <td onclick="event.stopPropagation()">
+            <button class="btn btn-secondary btn-xs" onclick="showMarketEntry('${m.id}')">編集</button>
+            <button class="btn btn-danger btn-xs" onclick="delMarketEntry('${m.id}')">✕</button>
+          </td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table></div>
+    ${pager('btm')}
+  `;
+}
+
+/* ── 所在地から市区町村を抽出 ── */
+// 都道府県プレフィックスを除去
+const _PREFS = ['東京都','北海道','大阪府','京都府','神奈川県','埼玉県','千葉県','愛知県','福岡県','静岡県','茨城県','広島県','兵庫県','新潟県','長野県','宮城県','群馬県','栃木県','岡山県','福島県','三重県','熊本県','鹿児島県','沖縄県','滋賀県','山口県','愛媛県','長崎県','奈良県','青森県','岩手県','大分県','石川県','山形県','宮崎県','富山県','秋田県','香川県','和歌山県','佐賀県','福井県','徳島県','高知県','島根県','鳥取県','山梨県','岐阜県'];
+function stripPref(loc) {
+  if (!loc) return '';
+  for (const p of _PREFS) { if (loc.startsWith(p)) return loc.slice(p.length); }
+  return loc;
+}
+function extractMunicipality(loc) {
+  if (!loc) return '不明';
+  const s = stripPref(loc.trim());
+  // 政令指定都市の区まで含む (横浜市鶴見区 etc.) — 非貪欲で最初の「市〜区」にマッチ
+  const m2 = s.match(/^(.{2,6}?市.{1,4}?区)/);
+  if (m2) return m2[1];
+  // 一般市区町村 — 非貪欲で最初の「市/区/町/村」で止まる
+  const m1 = s.match(/^(.{2,10}?[市区町村])/);
+  return m1 ? m1[1] : s.slice(0, 8) || '不明';
+}
+// 市区町村名を除去して地区名を抽出
+function extractDistrict(loc, city) {
+  if (!loc) return '（地区不明）';
+  const s = stripPref(loc.trim());
+  const rest = s.startsWith(city) ? s.slice(city.length).trim() : s.replace(city, '').trim();
+  // 丁目・番地以降を除く（地区名として数字の連続だけになる場合は不明扱い）
+  const d = rest.replace(/^\s*[\d一二三四五六七八九十]+丁目.*$/, '').replace(/\d+$/, '').trim();
+  return d || rest || '（地区不明）';
+}
+// 種別を統一表記に正規化
+function normalizeType(t) {
+  if (!t) return '不明';
+  if (/一戸建|戸建/.test(t)) return '一戸建て';
+  if (/マンション|フラット/.test(t)) return 'マンション';
+  if (/アパート/.test(t)) return 'アパート';
+  if (/^土地$|宅地\(土地\)/.test(t)) return '土地';
+  if (/店舗|テナント|事務所|オフィス|商業/.test(t)) return '店舗・事務所';
+  if (/駐車場/.test(t)) return '駐車場';
+  return t;
+}
+
+function renderMarketAnalysis(MD) {
+  if (!MD.length) return `<div class="empty"><div class="empty-icon">📈</div><div class="empty-title">分析データがありません</div></div>`;
+
+  // ── 市区町村一覧を抽出（データに存在するもの）──
+  const allCities = [...new Set(MD.map(m => extractMunicipality(m.location)))].sort();
+
+  // ── フィルター適用 ──
+  const filteredMD = mktCity ? MD.filter(m => extractMunicipality(m.location) === mktCity) : MD;
+
+  // ── グループキー: 市区町村選択中→地区、全体→市区町村 ──
+  function getGroupKey(m) {
+    if (!mktCity) return extractMunicipality(m.location);
+    return extractDistrict(m.location, mktCity);
+  }
+
+  const groupMap = {};
+  filteredMD.forEach(m => {
+    const key = getGroupKey(m);
+    if (!groupMap[key]) groupMap[key] = { prices:[], sqms:[], tsubos:[], count:0, types:{} };
+    groupMap[key].count++;
+    if (m.price)        groupMap[key].prices.push(parseFloat(m.price));
+    if (m.pricePerSqm)  groupMap[key].sqms.push(m.pricePerSqm);
+    if (m.pricePerTsubo) groupMap[key].tsubos.push(m.pricePerTsubo);
+    const t = normalizeType(m.type); groupMap[key].types[t] = (groupMap[key].types[t]||0)+1;
+  });
+
+  const groupStats = Object.entries(groupMap)
+    .map(([label, d]) => ({
+      label,
+      count:    d.count,
+      avgPrice: d.prices.length  ? d.prices.reduce((s,v)=>s+v,0)/d.prices.length   : 0,
+      avgSqm:   d.sqms.length    ? d.sqms.reduce((s,v)=>s+v,0)/d.sqms.length       : 0,
+      avgTsubo: d.tsubos.length  ? d.tsubos.reduce((s,v)=>s+v,0)/d.tsubos.length   : 0,
+      topType:  Object.entries(d.types).sort(([,a],[,b])=>b-a)[0]?.[0] || '-',
+    }))
+    .filter(c => c.count > 0)
+    .sort((a,b) => b.avgSqm - a.avgSqm || b.avgPrice - a.avgPrice);
+
+  const displayStats = mktCity ? groupStats : groupStats.slice(0, 15);
+  const maxPrice = Math.max(...displayStats.map(c=>c.avgPrice), 1);
+  const maxSqm   = Math.max(...displayStats.map(c=>c.avgSqm), 1);
+  const maxTsubo = Math.max(...displayStats.map(c=>c.avgTsubo), 1);
+
+  // Type distribution (filtered, normalized)
+  const typeMap = {};
+  filteredMD.forEach(m => { const t = normalizeType(m.type); typeMap[t] = (typeMap[t]||0)+1; });
+  const typeStats   = Object.entries(typeMap).sort(([,a],[,b])=>b-a);
+  const totalType   = filteredMD.length;
+
+  // Price distribution
+  const buckets = [
+    {label:'〜1000万', min:0, max:1000},
+    {label:'1000〜2000万', min:1000, max:2000},
+    {label:'2000〜3000万', min:2000, max:3000},
+    {label:'3000〜4000万', min:3000, max:4000},
+    {label:'4000〜5000万', min:4000, max:5000},
+    {label:'5000〜7000万', min:5000, max:7000},
+    {label:'7000万〜', min:7000, max:Infinity},
+  ];
+  const priceDist = buckets.map(b => ({
+    ...b, count: filteredMD.filter(m => m.price >= b.min && m.price < b.max).length
+  }));
+  const maxBucket = Math.max(...priceDist.map(b=>b.count), 1);
+
+  // Summary stats for selected city
+  const sumAvgPrice = filteredMD.filter(m=>m.price).length
+    ? filteredMD.filter(m=>m.price).reduce((s,m)=>s+parseFloat(m.price),0) / filteredMD.filter(m=>m.price).length : 0;
+  const sumAvgSqm = filteredMD.filter(m=>m.pricePerSqm).length
+    ? filteredMD.filter(m=>m.pricePerSqm).reduce((s,m)=>s+m.pricePerSqm,0) / filteredMD.filter(m=>m.pricePerSqm).length : 0;
+  const sumAvgTsubo = filteredMD.filter(m=>m.pricePerTsubo).length
+    ? filteredMD.filter(m=>m.pricePerTsubo).reduce((s,m)=>s+m.pricePerTsubo,0) / filteredMD.filter(m=>m.pricePerTsubo).length : 0;
+
+  const groupLabel = mktCity ? '地区別' : '市区町村別（上位15）';
+  const detailLabel = mktCity ? `${mktCity} の地区別詳細` : '市区町村別 相場比較';
+
+  return `
+    <!-- ── フィルターバー ── -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:10px 14px">
+      <span style="font-size:12px;font-weight:700;color:var(--primary);white-space:nowrap">📍 市区町村</span>
+      <select onchange="mktCity=this.value;renderMarket()" style="font-size:13px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;min-width:160px">
+        <option value="">全体（${MD.length}件）</option>
+        ${allCities.map(c => {
+          const cnt = MD.filter(m => extractMunicipality(m.location) === c).length;
+          return `<option value="${esc(c)}" ${mktCity===c?'selected':''}>${esc(c)}（${cnt}件）</option>`;
+        }).join('')}
+      </select>
+      ${mktCity ? `<button class="btn btn-secondary btn-xs" onclick="mktCity='';renderMarket()">✕ 絞込解除</button>` : ''}
+      <span style="font-size:11px;color:var(--text-muted);margin-left:auto">表示中: ${filteredMD.length}件</span>
+    </div>
+
+    <!-- ── 集計サマリー ── -->
+    <div class="mkt-stat-row" style="margin-bottom:14px">
+      <div class="mkt-stat"><div class="ms-label">件数</div><div class="ms-val" style="color:var(--primary)">${filteredMD.length}</div><div class="ms-sub">件</div></div>
+      <div class="mkt-stat"><div class="ms-label">平均価格</div><div class="ms-val" style="color:var(--primary)">${sumAvgPrice?Math.round(sumAvgPrice).toLocaleString():'-'}</div><div class="ms-sub">万円</div></div>
+      <div class="mkt-stat"><div class="ms-label">平均㎡単価</div><div class="ms-val" style="color:#553c9a">${sumAvgSqm?sumAvgSqm.toFixed(1):'-'}</div><div class="ms-sub">万円/㎡</div></div>
+      <div class="mkt-stat"><div class="ms-label">平均坪単価</div><div class="ms-val" style="color:#2c5282">${sumAvgTsubo?Math.round(sumAvgTsubo).toLocaleString():'-'}</div><div class="ms-sub">万円/坪</div></div>
+      <div class="mkt-stat"><div class="ms-label">成約件数</div><div class="ms-val" style="color:var(--success)">${filteredMD.filter(m=>m.status==='成約').length}</div><div class="ms-sub">件</div></div>
+    </div>
+
+    <!-- ── 地区/市区町村別 棒グラフ (メイン) ── -->
+    <div style="background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:14px">📊 ${detailLabel}</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">
+          <thead><tr style="background:var(--bg)">
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--text-muted);min-width:130px">${mktCity?'地区':'市区町村'}</th>
+            <th style="padding:7px 10px;text-align:right;font-size:11px;color:var(--text-muted)">件数</th>
+            <th style="padding:7px 10px;text-align:right;font-size:11px;color:var(--text-muted)">平均価格</th>
+            <th style="padding:7px 10px;font-size:11px;color:var(--text-muted)">㎡単価</th>
+            <th style="padding:7px 10px;font-size:11px;color:var(--text-muted)">坪単価</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--text-muted)">主な種別</th>
+          </tr></thead>
+          <tbody>
+          ${displayStats.map(c => {
+            const sqmPct  = maxSqm   ? c.avgSqm/maxSqm*100   : 0;
+            const prPct   = maxPrice ? c.avgPrice/maxPrice*100 : 0;
+            return `<tr style="border-bottom:1px solid var(--border)" ${!mktCity?`onclick="mktCity='${esc(c.label)}';renderMarket()" style="cursor:pointer;border-bottom:1px solid var(--border)"`:''}>
+              <td style="padding:7px 10px;font-weight:600">${esc(c.label)}</td>
+              <td style="padding:7px 10px;text-align:right;color:var(--text-muted)">${c.count}</td>
+              <td style="padding:7px 10px;text-align:right">${c.avgPrice?Math.round(c.avgPrice).toLocaleString()+'万':'-'}</td>
+              <td style="padding:7px 10px;min-width:160px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <div style="flex:1;background:var(--bg);border-radius:3px;height:14px;overflow:hidden">
+                    <div style="width:${sqmPct}%;height:100%;background:#553c9a;border-radius:3px"></div>
+                  </div>
+                  <span style="font-size:11px;font-weight:700;color:#553c9a;white-space:nowrap">${c.avgSqm?c.avgSqm.toFixed(1)+'万':'-'}</span>
+                </div>
+              </td>
+              <td style="padding:7px 10px;min-width:140px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <div style="flex:1;background:var(--bg);border-radius:3px;height:14px;overflow:hidden">
+                    <div style="width:${c.avgTsubo/maxTsubo*100}%;height:100%;background:#2c5282;border-radius:3px"></div>
+                  </div>
+                  <span style="font-size:11px;font-weight:700;color:#2c5282;white-space:nowrap">${c.avgTsubo?Math.round(c.avgTsubo)+'万':'-'}</span>
+                </div>
+              </td>
+              <td style="padding:7px 10px;font-size:11px;color:var(--text-muted)">${esc(c.topType)}</td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table>
+        ${!mktCity ? `<div style="font-size:11px;color:var(--text-muted);padding:8px 10px">↑ 行をクリックすると地区別詳細に絞り込めます</div>` : ''}
+      </div>
+    </div>
+
+    <!-- ── 下段: 価格帯・種別 ── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="chart-wrap">
+        <div class="chart-title">価格帯別分布${mktCity?' ('+mktCity+')':''}</div>
+        ${priceDist.map(b => `
+          <div class="bar-row">
+            <div class="bar-label" style="width:110px">${esc(b.label)}</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${b.count/maxBucket*100}%;background:var(--accent)">${b.count}件</div>
+            </div>
+            <div class="bar-val">${b.count}件</div>
+          </div>`).join('')}
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-title">種別構成${mktCity?' ('+mktCity+')':''}</div>
+        ${typeStats.map(([type, cnt]) => `
+          <div class="bar-row">
+            <div class="bar-label" style="width:110px">${esc(type)}</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${cnt/totalType*100}%;background:var(--info)">${(cnt/totalType*100).toFixed(0)}%</div>
+            </div>
+            <div class="bar-val">${cnt}件</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- ── 自社物件 vs 市場相場 ── -->
+    <div class="chart-wrap">
+      <div class="chart-title">🏠 自社物件 vs 市場相場比較${mktCity?' ('+mktCity+')':''}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg)">
+          <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--text-muted)">物件名</th>
+          <th style="padding:7px 10px;text-align:right;font-size:11px;color:var(--text-muted)">自社価格</th>
+          <th style="padding:7px 10px;text-align:right;font-size:11px;color:var(--text-muted)">自社㎡単価</th>
+          <th style="padding:7px 10px;text-align:right;font-size:11px;color:var(--text-muted)">市場平均㎡単価</th>
+          <th style="padding:7px 10px;text-align:right;font-size:11px;color:var(--text-muted)">乖離率</th>
+        </tr></thead><tbody>
+        ${D.properties.filter(p => p.price && (p.buildArea||p.landArea)).map(p => {
+          const area   = parseFloat(p.buildArea)||parseFloat(p.landArea)||0;
+          const mySqm  = area > 0 ? parseFloat(p.price)/area : 0;
+          const myCity = extractMunicipality(p.location||'');
+          const mktMatch = filteredMD.filter(m =>
+            (!mktCity || extractMunicipality(m.location)===mktCity) &&
+            extractMunicipality(m.location)===myCity && m.pricePerSqm
+          );
+          const mktAvgSqm = mktMatch.length ? mktMatch.reduce((s,m)=>s+m.pricePerSqm,0)/mktMatch.length : 0;
+          const diff = mktAvgSqm && mySqm ? ((mySqm-mktAvgSqm)/mktAvgSqm*100) : null;
+          return `<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="nav('props');setTimeout(()=>showPropDetail('${p.id}'),50)">
+            <td style="padding:6px 10px;font-weight:600">${esc(p.name||'-')} <span style="font-size:10px;color:var(--text-muted)">${esc(myCity)}</span></td>
+            <td style="padding:6px 10px;text-align:right">${parseInt(p.price).toLocaleString()}万</td>
+            <td style="padding:6px 10px;text-align:right;color:#553c9a">${mySqm>0?mySqm.toFixed(1)+'万/㎡':'-'}</td>
+            <td style="padding:6px 10px;text-align:right;color:var(--text-muted)">${mktAvgSqm>0?mktAvgSqm.toFixed(1)+'万/㎡':'データ不足'}</td>
+            <td style="padding:6px 10px;text-align:right;font-weight:700;color:${diff===null?'var(--text-muted)':diff>0?'var(--danger)':'var(--success)'}">
+              ${diff===null ? '-' : (diff>0?'+':'')+diff.toFixed(1)+'%'}
+            </td>
+          </tr>`;
+        }).join('')||'<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-muted)">面積が設定された自社物件がありません</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+/* ══════════════════════════════════════════════
+   Market Map (Leaflet.js + Nominatim geocoding)
+══════════════════════════════════════════════ */
+const _geoCache = {}; // address → {lat,lng} (in-memory session cache)
+
+async function geocodeAddress(addr) {
+  if (!addr) return null;
+  const key = addr.trim();
+  if (_geoCache[key]) return _geoCache[key];
+  // Also check persistent cache in D
+  if (!D.geocodeCache) D.geocodeCache = {};
+  if (D.geocodeCache[key]) { _geoCache[key] = D.geocodeCache[key]; return _geoCache[key]; }
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(key)}`, {
+      headers: { 'Accept-Language': 'ja', 'User-Agent': 'FudosanKanri/1.0' }
+    });
+    const data = await res.json();
+    if (data && data[0]) {
+      const pt = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      _geoCache[key] = pt;
+      D.geocodeCache[key] = pt;
+      return pt;
+    }
+  } catch(_) {}
+  return null;
+}
+
+async function initMarketMap(MD) {
+  const mapEl = document.getElementById('market-map');
+  if (!mapEl || typeof L === 'undefined') return;
+
+  // Destroy previous instance
+  if (_leafletMap) { _leafletMap.remove(); _leafletMap = null; }
+
+  // Center on Japan (Kanto area default)
+  _leafletMap = L.map('market-map').setView([35.45, 139.45], 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19
+  }).addTo(_leafletMap);
+
+  const statusEl = document.getElementById('geo-status');
+  const legendEl = document.getElementById('map-legend');
+
+  // Market data markers (blue = 販売中, green = 成約)
+  const marketIcon = (status) => L.circleMarker([0,0], {
+    radius: 8, fillColor: status==='成約'?'#38a169':'#3182ce',
+    color:'#fff', weight:2, fillOpacity:0.85
+  });
+
+  // Own property markers (orange)
+  const ownIcon = L.divIcon({
+    html:'<div style="background:#d4a017;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">🏠</div>',
+    iconSize:[22,22], iconAnchor:[11,11], className:''
+  });
+
+  let geocoded = 0, total = MD.length + D.properties.length;
+  const bounds = [];
+
+  // Plot market data
+  for (const m of MD) {
+    if (statusEl) statusEl.textContent = `ジオコーディング中… ${++geocoded}/${total}件`;
+    const pt = await geocodeAddress(m.location);
+    await new Promise(r => setTimeout(r, 300)); // rate limit: ~3 req/s
+    if (!pt) continue;
+    bounds.push([pt.lat, pt.lng]);
+    L.circleMarker([pt.lat, pt.lng], {
+      radius:8,
+      fillColor: m.status==='成約'?'#38a169':'#3182ce',
+      color:'#fff', weight:2, fillOpacity:0.85
+    }).addTo(_leafletMap).bindPopup(`
+      <b>${esc(m.location||'不明')}</b><br>
+      種別: ${esc(m.type||'-')} / ${esc(m.layout||'-')}<br>
+      価格: <b>${m.price?parseInt(m.price).toLocaleString()+'万円':'-'}</b><br>
+      面積: ${m.buildArea?m.buildArea+'㎡':m.landArea?m.landArea+'㎡(土)':'-'}<br>
+      ${m.pricePerSqm?'㎡単価: '+m.pricePerSqm.toFixed(1)+'万円<br>':''
+      }ステータス: ${esc(m.status||'不明')}<br>
+      情報源: ${({reins:'レインズ',suumo:'SUUMO',homes:"HOME'S",manual:'手動',mlit:'国交省'})[m.source]||m.source||'?'}
+    `);
+  }
+
+  // Plot own properties
+  for (const p of D.properties) {
+    if (statusEl) statusEl.textContent = `ジオコーディング中… ${++geocoded}/${total}件`;
+    const pt = await geocodeAddress(p.location);
+    await new Promise(r => setTimeout(r, 300));
+    if (!pt) continue;
+    bounds.push([pt.lat, pt.lng]);
+    L.marker([pt.lat, pt.lng], { icon: ownIcon }).addTo(_leafletMap).bindPopup(`
+      <b>【自社】${esc(p.name||p.location||'物件')}</b><br>
+      ${esc(p.location||'-')}<br>
+      種別: ${esc(p.type||'-')} / ${esc(p.layout||'-')}<br>
+      価格: <b style="color:#1a3a5c">${formatPrice(p.price)}</b><br>
+      ステータス: ${esc(p.status||'-')}
+    `);
+  }
+
+  if (bounds.length > 0) _leafletMap.fitBounds(bounds, { padding: [30, 30] });
+  if (statusEl) statusEl.textContent = `${MD.length}件の市場データ・${D.properties.length}件の自社物件を表示`;
+  save(); // persist geocode cache
+
+  if (legendEl) legendEl.innerHTML = `
+    <span style="font-weight:700;color:var(--text-muted)">凡例:</span>
+    <span class="map-leg-item"><span class="map-leg-dot" style="background:#3182ce"></span>販売中（市場）</span>
+    <span class="map-leg-item"><span class="map-leg-dot" style="background:#38a169"></span>成約（市場）</span>
+    <span class="map-leg-item"><span class="map-leg-dot" style="background:#d4a017"></span>自社物件</span>
+    <span style="margin-left:auto;font-size:11px;color:var(--text-muted)">地図: OpenStreetMap / ジオコーダー: Nominatim</span>
+  `;
+}
+
+/* ══════════════════════════════════════════════
+   売主マイページ生成
+══════════════════════════════════════════════ */
+function generateSellerPage(propId) {
+  const p  = D.properties.find(x => x.id === propId); if (!p) return;
+  const s  = D.agents.find(a => a.id === p.sellerId);
+  const b  = D.agents.find(a => a.id === p.brokerId);
+  const MD = D.marketData || [];
+  const today = new Date().toLocaleDateString('ja-JP', {year:'numeric',month:'long',day:'numeric'});
+
+  // Nearby market comparables
+  const comps = MD.filter(m => {
+    const myLoc = (p.location||'').toLowerCase();
+    const ml = (m.location||'').toLowerCase();
+    const parts = myLoc.replace(/[0-9０-９\-－]/g,'').split(/[都道府県市区町村丁目番号]/g).filter(x=>x.length>1);
+    return parts.some(part => ml.includes(part));
+  }).slice(0, 6);
+
+  const inq = p.inquiries || {};
+  const portals = [
+    {key:'suumo',  label:'SUUMO'},
+    {key:'homes',  label:"HOME'S"},
+    {key:'athome', label:'athome'},
+    {key:'other',  label:'その他'},
+  ];
+  const totalInq = portals.reduce((s,pt) => s + (parseInt(inq[pt.key]?.count)||0), 0);
+  const totalViews = portals.reduce((s,pt) => s + (parseInt(inq[pt.key]?.views)||0), 0);
+
+  const showings = p.showings || [];
+  const reports  = p.agentReports || [];
+
+  // Price history chart bars
+  const ph = (p.priceHistory||[]);
+  const phHtml = ph.length > 1 ? ph.slice().reverse().map((h,i,arr)=>{
+    const prev = arr[i+1];
+    const delta = prev ? h.price - prev.price : 0;
+    const dStr = delta!==0 ? `<span style="color:${delta<0?'#38a169':'#e53e3e'};font-size:11px">${delta<0?'▼':'▲'}${Math.abs(delta).toLocaleString()}万</span>` : '';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #eee;font-size:13px">
+      <span style="color:#888;font-size:11px;width:80px">${h.date}</span>
+      <span style="font-weight:700;color:#1a3a5c">${parseInt(h.price).toLocaleString()}万円</span>${dStr}
+      ${h.note?`<span style="color:#888;font-size:11px">${h.note}</span>`:''}
+    </div>`;
+  }).join('') : '<p style="color:#888;font-size:13px">価格変更なし</p>';
+
+  const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>販売状況レポート - ${esc(p.name||p.location||'物件')}</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN','Yu Gothic UI',sans-serif; background:#f5f7fa; color:#2d3748; font-size:14px; }
+  .header { background:linear-gradient(135deg,#1a3a5c,#2c5282); color:#fff; padding:28px 32px; }
+  .header h1 { font-size:22px; font-weight:700; margin-bottom:4px; }
+  .header .sub { font-size:13px; opacity:.7; }
+  .header .date { font-size:12px; opacity:.55; margin-top:8px; }
+  .container { max-width:860px; margin:0 auto; padding:24px 20px; }
+  .card { background:#fff; border-radius:10px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:18px; overflow:hidden; }
+  .card-hd { padding:14px 20px; border-bottom:1px solid #eee; font-size:13px; font-weight:700; color:#1a3a5c; background:#f8fafc; }
+  .card-body { padding:18px 20px; }
+  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .info-cell { background:#f8fafc; padding:10px 12px; border-radius:7px; }
+  .info-cell .il { font-size:10px; color:#888; margin-bottom:2px; }
+  .info-cell .iv { font-size:14px; font-weight:600; }
+  .stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:0; }
+  .stat-box { background:linear-gradient(135deg,#1a3a5c,#2c5282); color:#fff; border-radius:10px; padding:16px 18px; text-align:center; }
+  .stat-box .sv { font-size:28px; font-weight:800; }
+  .stat-box .sl { font-size:11px; opacity:.75; margin-top:2px; }
+  .portal-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  .portal-card { border:2px solid #eee; border-radius:8px; padding:12px 14px; }
+  .portal-card .pn { font-weight:700; font-size:13px; margin-bottom:8px; }
+  .portal-card .pm { display:flex; justify-content:space-between; font-size:12px; color:#555; }
+  .portal-card .pm .pv { font-size:18px; font-weight:800; color:#1a3a5c; }
+  .showing-row { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid #eee; align-items:flex-start; font-size:13px; }
+  .showing-row:last-child { border-bottom:none; }
+  .showing-row .sd { width:90px; font-size:11px; color:#888; flex-shrink:0; }
+  .comp-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .comp-table th { background:#f8fafc; padding:8px 10px; text-align:left; font-size:11px; color:#888; border-bottom:2px solid #eee; }
+  .comp-table td { padding:7px 10px; border-bottom:1px solid #eee; }
+  .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:10px; font-weight:600; }
+  .badge-blue { background:#ebf8ff; color:#2b6cb0; }
+  .badge-green { background:#f0fff4; color:#276749; }
+  .footer { text-align:center; padding:24px; font-size:11px; color:#aaa; }
+  @media(max-width:600px) {
+    .stat-row { grid-template-columns:1fr 1fr; }
+    .info-grid { grid-template-columns:1fr; }
+    .portal-grid { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📊 販売状況レポート</h1>
+  <div class="sub">${esc(p.name||p.location||'物件')}</div>
+  <div class="date">報告日：${today}　／　担当：${esc((b?.name||s?.name||'担当者'))} ${p.contactName?'（'+esc(p.contactName)+'）':''}</div>
+</div>
+<div class="container">
+
+  <!-- Summary stats -->
+  <div class="card" style="background:none;box-shadow:none;margin-bottom:14px">
+    <div class="stat-row">
+      <div class="stat-box">
+        <div class="sv">${totalInq}</div>
+        <div class="sl">累計問い合わせ数</div>
+      </div>
+      <div class="stat-box" style="background:linear-gradient(135deg,#276749,#38a169)">
+        <div class="sv">${totalViews}</div>
+        <div class="sl">累計閲覧数</div>
+      </div>
+      <div class="stat-box" style="background:linear-gradient(135deg,#744210,#c05621)">
+        <div class="sv">${showings.length}</div>
+        <div class="sl">内見件数</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Property info -->
+  <div class="card">
+    <div class="card-hd">🏠 物件基本情報</div>
+    <div class="card-body">
+      <div class="info-grid">
+        <div class="info-cell"><div class="il">所在地</div><div class="iv">📍 ${esc(p.location||'-')}</div></div>
+        <div class="info-cell"><div class="il">販売価格</div><div class="iv" style="color:#1a3a5c;font-size:18px">${formatPrice(p.price)}</div></div>
+        <div class="info-cell"><div class="il">種別</div><div class="iv">${esc(p.type||'-')}</div></div>
+        <div class="info-cell"><div class="il">間取り</div><div class="iv">${esc(p.layout||'-')}</div></div>
+        <div class="info-cell"><div class="il">建物面積</div><div class="iv">${(p.buildArea||p.area)?((p.buildArea||p.area)+'㎡'):'-'}</div></div>
+        <div class="info-cell"><div class="il">土地面積</div><div class="iv">${p.landArea?(p.landArea+'㎡'):'-'}</div></div>
+        <div class="info-cell"><div class="il">築年数</div><div class="iv">${p.age!=null&&p.age!==''?'築'+p.age+'年':'-'}</div></div>
+        <div class="info-cell"><div class="il">ステータス</div><div class="iv"><span class="badge ${p.status==='成約'?'badge-green':'badge-blue'}">${esc(p.status||'販売中')}</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Portal inquiry -->
+  <div class="card">
+    <div class="card-hd">📣 ポータルサイト別 反響状況</div>
+    <div class="card-body">
+      <div class="portal-grid">
+        ${portals.map(pt => {
+          const d = inq[pt.key]||{};
+          return `<div class="portal-card">
+            <div class="pn">${pt.label}</div>
+            <div class="pm"><span>問い合わせ</span><span class="pv">${parseInt(d.count)||0}件</span></div>
+            <div class="pm" style="margin-top:4px"><span>閲覧数</span><span style="font-size:14px;font-weight:700;color:#553c9a">${parseInt(d.views)||0}</span></div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  </div>
+
+  <!-- Price history -->
+  ${ph.length > 1 ? `<div class="card">
+    <div class="card-hd">💹 価格変更履歴</div>
+    <div class="card-body">${phHtml}</div>
+  </div>` : ''}
+
+  <!-- Showings -->
+  <div class="card">
+    <div class="card-hd">🏃 内見履歴</div>
+    <div class="card-body">
+      ${showings.length ? showings.slice().reverse().map(sh => `
+        <div class="showing-row">
+          <div class="sd">${esc(sh.date||'-')}</div>
+          <div><b>${esc(sh.name||'来客')}</b> ${sh.result?`<span class="badge badge-blue">${esc(sh.result)}</span>`:''}<br>
+          ${sh.memo?`<span style="font-size:11px;color:#888">${esc(sh.memo)}</span>`:''}</div>
+        </div>`).join('') : '<p style="color:#888;font-size:13px">内見記録はまだありません</p>'}
+    </div>
+  </div>
+
+  <!-- Nearby comps -->
+  ${comps.length ? `<div class="card">
+    <div class="card-hd">📊 近隣成約・販売事例（${comps.length}件）</div>
+    <div class="card-body">
+      <table class="comp-table">
+        <thead><tr><th>所在地</th><th>種別</th><th>面積</th><th>価格</th><th>㎡単価</th><th>状況</th></tr></thead>
+        <tbody>
+          ${comps.map(m=>{
+            const area = m.buildArea?m.buildArea+'㎡':m.landArea?m.landArea+'㎡':'−';
+            return `<tr>
+              <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.location||'-')}</td>
+              <td>${esc(m.type||'-')}</td><td>${area}</td>
+              <td><b>${m.price?parseInt(m.price).toLocaleString()+'万':'-'}</b></td>
+              <td style="color:#553c9a">${m.pricePerSqm?m.pricePerSqm.toFixed(1)+'万/㎡':'-'}</td>
+              <td><span class="badge ${m.status==='成約'?'badge-green':'badge-blue'}">${esc(m.status||'?')}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>` : ''}
+
+  <!-- Agent reports -->
+  ${reports.length ? `<div class="card">
+    <div class="card-hd">📝 担当者コメント</div>
+    <div class="card-body">
+      ${reports.slice().reverse().map(r=>`
+        <div style="border-left:3px solid #2c5282;padding:8px 14px;margin-bottom:10px;background:#f8fafc;border-radius:0 6px 6px 0">
+          <div style="font-size:11px;color:#888;margin-bottom:4px">${esc(r.date||'-')} ${esc(r.author||'')}</div>
+          <div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${esc(r.content||'')}</div>
+        </div>`).join('')}
+    </div>
+  </div>` : ''}
+
+</div>
+<div class="footer">このレポートは ${today} 時点の情報です。ご不明な点はご担当者までお問い合わせください。</div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `売主マイページ_${(p.name||p.location||'物件').replace(/[\\/:*?"<>|]/g,'')}${new Date().toLocaleDateString('ja-JP').replace(/\//g,'-')}.html`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast('売主マイページを生成しました ✅', 'ok');
+}
+
+/* ══════════════════════════════════════════════
+   国土交通省「不動産取引価格情報」連携
+   データソース: citycreationnet-cloud.github.io/market-pricesearch/cache/
+══════════════════════════════════════════════ */
+let _mlitCache = {}; // cityCode → JSON data (session cache)
+
+async function showMlitImport() {
+  showModal(`
+    <div class="modal modal-xl">
+      <div class="modal-hd">
+        <div>
+          <div class="modal-title">🏛 国土交通省 成約事例取込</div>
+          <div class="modal-subtitle">不動産取引価格情報ライブラリ（神奈川県）から実成約データを取込みます</div>
+        </div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <div class="form-group">
+              <label>市区町村 <span class="req">*</span></label>
+              <select id="mlit-city" onchange="mlitLoadDistricts()" style="font-size:13px">
+                <option value="">選択してください</option>
+                ${MLIT_CITIES.map(c=>`<option value="${c.code}">${c.name}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>地区（複数選択可）</label>
+              <div id="mlit-districts" style="border:1px solid var(--border);border-radius:6px;max-height:160px;overflow-y:auto;padding:6px;font-size:12px;color:var(--text-muted)">
+                ← 市区町村を選択すると地区が表示されます
+              </div>
+              <div style="margin-top:4px;display:flex;gap:6px">
+                <button class="btn btn-secondary btn-xs" onclick="mlitSelectAllDistricts(true)">全選択</button>
+                <button class="btn btn-secondary btn-xs" onclick="mlitSelectAllDistricts(false)">全解除</button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="form-group">
+              <label>物件種別</label>
+              <select id="mlit-type" style="font-size:13px">
+                <option value="all">すべて</option>
+                <option value="house">一戸建て（土地と建物）</option>
+                <option value="mansion">マンション等</option>
+                <option value="land">土地のみ</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>取込件数上限</label>
+              <select id="mlit-limit" style="font-size:13px">
+                <option value="50">50件（軽量）</option>
+                <option value="100" selected>100件（標準）</option>
+                <option value="200">200件（詳細）</option>
+                <option value="0">全件（時間がかかる場合あり）</option>
+              </select>
+            </div>
+            <div style="background:#fffbeb;border:1px solid #fef08a;border-radius:6px;padding:10px 12px;font-size:11px;color:#92400e;line-height:1.6;margin-top:8px">
+              <b>データについて</b><br>
+              ・出典：国土交通省「不動産情報ライブラリ」成約価格情報<br>
+              ・月次更新（自動）<br>
+              ・価格は実際の成約価格（万円換算）<br>
+              ・既存サービス連携：<a href="https://citycreationnet-cloud.github.io/market-pricesearch/" target="_blank" style="color:#2b6cb0">相場検索サービス</a>
+            </div>
+          </div>
+        </div>
+        <div id="mlit-preview" style="margin-top:14px"></div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="executeMlitImport()" id="mlit-import-btn" disabled>データを取込む</button>
+      </div>
+    </div>`);
+}
+
+async function mlitLoadDistricts() {
+  const cityCode = document.getElementById('mlit-city').value;
+  if (!cityCode) return;
+  const distEl = document.getElementById('mlit-districts');
+  const importBtn = document.getElementById('mlit-import-btn');
+  distEl.innerHTML = '<span style="color:var(--text-muted)">⏳ データ読込中…</span>';
+  if (importBtn) importBtn.disabled = true;
+
+  try {
+    let data = _mlitCache[cityCode];
+    if (!data) {
+      const res = await fetch(`${MLIT_BASE}${cityCode}.json`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      data = await res.json();
+      _mlitCache[cityCode] = data;
+    }
+
+    const districts = Object.keys(data.districts || {}).sort();
+    const total = data.raw_record_count || 0;
+    const updated = data.updated_at ? new Date(data.updated_at).toLocaleDateString('ja-JP') : '不明';
+
+    distEl.innerHTML = districts.length
+      ? districts.map(d => `
+          <label style="display:flex;align-items:center;gap:6px;padding:3px 4px;cursor:pointer;border-radius:4px;transition:background .1s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+            <input type="checkbox" class="mlit-dist-cb" value="${esc(d)}" style="margin:0">
+            <span>${esc(d)}</span>
+          </label>`).join('')
+      : '<span style="color:var(--text-muted)">地区データなし</span>';
+
+    document.getElementById('mlit-preview').innerHTML = `
+      <div style="background:#f0fff4;border:1px solid #9ae6b4;border-radius:6px;padding:10px 14px;font-size:12px;color:#276749">
+        ✅ <b>${data.municipality}</b> のデータを読込みました（総件数：${total.toLocaleString()}件 / 更新日：${updated}）
+      </div>`;
+
+    if (importBtn) importBtn.disabled = false;
+    // Auto-select all by default
+    mlitSelectAllDistricts(true);
+  } catch(e) {
+    distEl.innerHTML = `<span style="color:var(--danger)">❌ 読込失敗: ${e.message}</span>`;
+    document.getElementById('mlit-preview').innerHTML = '';
+  }
+}
+
+function mlitSelectAllDistricts(select) {
+  document.querySelectorAll('.mlit-dist-cb').forEach(cb => cb.checked = select);
+}
+
+async function executeMlitImport() {
+  const cityCode  = document.getElementById('mlit-city').value;
+  const typeKey   = document.getElementById('mlit-type').value;
+  const limitVal  = parseInt(document.getElementById('mlit-limit').value) || 0;
+  const selDists  = [...document.querySelectorAll('.mlit-dist-cb:checked')].map(cb => cb.value);
+
+  if (!cityCode) { toast('市区町村を選択してください', 'err'); return; }
+
+  const data = _mlitCache[cityCode];
+  if (!data) { toast('先に市区町村を選択してデータを読み込んでください', 'err'); return; }
+
+  const btn = document.getElementById('mlit-import-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '取込中…'; }
+
+  // Collect samples from selected districts
+  const districts = data.districts || {};
+  const allSamples = [];
+
+  const targetDists = selDists.length ? selDists : Object.keys(districts);
+  for (const dist of targetDists) {
+    const d = districts[dist];
+    if (!d) continue;
+    const cat = typeKey === 'all' ? d.all : typeKey === 'house' ? d.house : typeKey === 'mansion' ? d.mansion : d.land;
+    const samples = (cat?.samples || []).map(s => ({ ...s, _district: dist }));
+    allSamples.push(...samples);
+  }
+
+  // Limit
+  const limited = limitVal > 0 ? allSamples.slice(0, limitVal) : allSamples;
+
+  // Convert to market data format
+  const TYPE_MAP = {
+    '宅地(土地と建物)': '一戸建て',
+    '中古マンション等': 'マンション',
+    '宅地(土地)': '土地',
+    '農地': '農地',
+    '林地': '林地',
+  };
+  const currentYear = new Date().getFullYear();
+
+  let added = 0;
+  if (!D.marketData) D.marketData = [];
+
+  for (const s of limited) {
+    const type = normalizeType(TYPE_MAP[s.type] || s.type || 'その他');
+    const isLand     = s.type === '宅地(土地)';
+    const isMansion  = s.type === '中古マンション等';
+    const priceMan   = s.trade_price ? Math.round(s.trade_price / 10000) : null;
+    const sqmMan     = s.price_per_sqm  ? s.price_per_sqm  / 10000 : null;
+    const tsuboMan   = s.price_per_tsubo ? s.price_per_tsubo / 10000 : null;
+
+    // Parse age from building_year
+    let age = null;
+    if (s.building_year) {
+      const m = s.building_year.match(/(\d{4})/);
+      if (m) age = currentYear - parseInt(m[1]);
+    }
+
+    D.marketData.push({
+      id:          Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      source:      'mlit',
+      status:      '成約',
+      location:    `${data.municipality} ${s._district}`,
+      type,
+      layout:      '',
+      price:       priceMan,
+      buildArea:   isMansion  ? (s.area || null)  : (!isLand ? (s.total_floor_area || null) : null),
+      landArea:    isLand     ? (s.area || null)   : (!isMansion ? (s.area || null) : null),
+      age,
+      station:     '',
+      walkMin:     null,
+      pricePerSqm:   sqmMan,
+      pricePerTsubo: tsuboMan,
+      contractDate:  s.period || '',
+      structure:   s.structure || '',
+      importedAt:  Date.now(),
+    });
+    added++;
+  }
+
+  save();
+  document.getElementById('nb-market').textContent = D.marketData.length;
+  closeModal();
+  toast(`国交省データ ${added}件を取込みました ✅`, 'ok');
+  renderMarket();
+}
+
+/* ── Manual market entry form ── */
+function showMarketEntry(editId = '') {
+  const m = editId ? (D.marketData||[]).find(x => x.id === editId) : null;
+  const TYPES = ['マンション','一戸建て','土地','アパート','収益ビル','店舗','その他'];
+  showModal(`
+    <div class="modal modal-xl">
+      <div class="modal-hd">
+        <div class="modal-title">${m ? '市場データを編集' : '市場データを手動入力'}</div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>情報源</label>
+                <select id="m-source">
+                  <option value="manual" ${(!m||m.source==='manual')?'selected':''}>手動入力</option>
+                  <option value="reins"  ${m?.source==='reins'?'selected':''}>レインズ</option>
+                  <option value="suumo"  ${m?.source==='suumo'?'selected':''}>SUUMO</option>
+                  <option value="homes"  ${m?.source==='homes'?'selected':''}>HOME'S</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>ステータス</label>
+                <select id="m-status">
+                  <option value="販売中" ${(!m||m.status==='販売中')?'selected':''}>販売中</option>
+                  <option value="成約"   ${m?.status==='成約'?'selected':''}>成約</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>所在地 <span class="req">*</span></label>
+              <input type="text" id="m-location" value="${ea(m?.location||'')}" placeholder="例：神奈川県横浜市青葉区〇〇">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>種別</label>
+                <select id="m-type">
+                  <option value="">選択</option>
+                  ${TYPES.map(t=>`<option value="${t}" ${m?.type===t?'selected':''}>${t}</option>`).join('')}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>間取り</label>
+                <input type="text" id="m-layout" value="${ea(m?.layout||'')}" placeholder="例：3LDK">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>販売価格（万円）</label>
+                <input type="number" id="m-price" value="${m?.price||''}" placeholder="例：4500">
+              </div>
+              <div class="form-group">
+                <label>成約/掲載日</label>
+                <input type="text" id="m-date" value="${ea(m?.contractDate||'')}" placeholder="例：2024-03">
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>建物面積（㎡）</label>
+                <input type="number" id="m-build-area" value="${m?.buildArea||''}" placeholder="例：85.3">
+              </div>
+              <div class="form-group">
+                <label>土地面積（㎡）</label>
+                <input type="number" id="m-land-area" value="${m?.landArea||''}" placeholder="例：120">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>築年数（年）</label>
+                <input type="number" id="m-age" value="${m?.age||''}" placeholder="例：10">
+              </div>
+              <div class="form-group">
+                <label>最寄り駅徒歩（分）</label>
+                <input type="number" id="m-walk" value="${m?.walkMin||''}" placeholder="例：8">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>最寄り駅</label>
+              <input type="text" id="m-station" value="${ea(m?.station||'')}" placeholder="例：東急田園都市線 たまプラーザ駅">
+            </div>
+            <div class="form-group">
+              <label>備考</label>
+              <textarea id="m-note" placeholder="特記事項…" style="min-height:60px">${esc(m?.note||'')}</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-ft">
+        ${m ? `<button class="btn btn-danger" onclick="delMarketEntry('${m.id}')">削除</button>` : ''}
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="saveMarketEntry('${editId}')">
+          ${m ? '更新する' : '登録する'}
+        </button>
+      </div>
+    </div>`);
+}
+
+function saveMarketEntry(editId) {
+  const location = document.getElementById('m-location').value.trim();
+  if (!location) { toast('所在地を入力してください','err'); return; }
+  const entry = {
+    id:           editId || uid(),
+    source:       document.getElementById('m-source').value,
+    status:       document.getElementById('m-status').value,
+    location,
+    type:         document.getElementById('m-type').value,
+    layout:       document.getElementById('m-layout').value.trim(),
+    price:        parseFloat(document.getElementById('m-price').value) || 0,
+    contractDate: document.getElementById('m-date').value.trim(),
+    buildArea:    parseFloat(document.getElementById('m-build-area').value) || 0,
+    landArea:     parseFloat(document.getElementById('m-land-area').value) || 0,
+    age:          parseFloat(document.getElementById('m-age').value) || 0,
+    walkMin:      parseFloat(document.getElementById('m-walk').value) || 0,
+    station:      document.getElementById('m-station').value.trim(),
+    note:         document.getElementById('m-note').value.trim(),
+    importedAt:   editId ? ((D.marketData||[]).find(x=>x.id===editId)?.importedAt||Date.now()) : Date.now(),
+    importDate:   new Date().toLocaleDateString('ja-JP'),
+  };
+  calcMktUnit(entry);
+  if (!D.marketData) D.marketData = [];
+  const ex = D.marketData.findIndex(x => x.id === entry.id);
+  if (ex >= 0) D.marketData[ex] = entry;
+  else         D.marketData.push(entry);
+  save(); closeModal(); toast(`市場データを${editId?'更新':'登録'}しました`,'ok'); renderMarket();
+}
+
+function delMarketEntry(id) {
+  if (!confirm('このデータを削除しますか？')) return;
+  D.marketData = (D.marketData||[]).filter(x => x.id !== id);
+  save(); toast('削除しました','ok'); closeModal(); renderMarket();
+}
+
+function clearMarketData() {
+  if (!confirm(`市場データ${(D.marketData||[]).length}件を全て削除しますか？`)) return;
+  D.marketData = [];
+  save(); toast('全データを削除しました','ok'); renderMarket();
+}
+
+/* ── REINS CSV Import ── */
+function showCSVImport() {
+  showModal(`
+    <div class="modal" style="max-width:640px">
+      <div class="modal-hd">
+        <div>
+          <div class="modal-title">📥 レインズ CSV取込</div>
+          <div class="modal-subtitle">東日本・西日本レインズからエクスポートしたCSVを貼り付けてください</div>
+        </div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;line-height:1.8;color:#2b6cb0">
+          <strong>📋 レインズからのCSV出力手順</strong><br>
+          1. レインズにログイン → 物件検索 → 検索結果を表示<br>
+          2. 「CSV出力」「一覧印刷」などからCSVをダウンロード<br>
+          3. ExcelでCSVを開いて全選択（Ctrl+A）→ コピー（Ctrl+C）<br>
+          4. 下のテキストエリアに貼り付け → 「取込開始」
+        </div>
+        <div style="background:#fefcbf;border:1px solid #fcd34d;border-radius:6px;padding:10px;margin-bottom:12px;font-size:11px;color:#92400e">
+          ⚠️ 対応カラム：所在地, 種別, 間取, 価格（万円）, 建物面積, 土地面積, 築年月, 成約年月, 成約価格<br>
+          1行目がヘッダーの場合は自動でスキップします。カラム順が違う場合もAIが自動マッピングを試みます。
+        </div>
+        <div class="form-group">
+          <label>CSVデータ（Excelからのコピー可）</label>
+          <textarea id="csv-input" placeholder="ここにCSVまたはTSVデータを貼り付け…&#10;例：&#10;所在地	種別	間取	価格	建物面積	成約年月&#10;神奈川県横浜市〇〇	一戸建て	4LDK	3980	105.2	2024-02" style="min-height:180px;font-family:monospace;font-size:11px"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="csv-source" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
+            <option value="reins">レインズ</option>
+            <option value="suumo">SUUMO</option>
+            <option value="homes">HOME'S</option>
+            <option value="manual">その他</option>
+          </select>
+          <select id="csv-status" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
+            <option value="成約">成約事例</option>
+            <option value="販売中">販売中物件</option>
+          </select>
+          <span id="csv-preview-info" style="font-size:11px;color:var(--text-muted)"></span>
+        </div>
+        <div id="csv-preview" style="margin-top:10px"></div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="importCSVData()">取込開始</button>
+      </div>
+    </div>`);
+
+  document.getElementById('csv-input')?.addEventListener('input', previewCSV);
+}
+
+function parseCSVorTSV(text) {
+  const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return [];
+  // Detect delimiter
+  const tab  = (lines[0].match(/\t/g)||[]).length;
+  const comma = (lines[0].match(/,/g)||[]).length;
+  const delim = tab >= comma ? '\t' : ',';
+
+  return lines.map(line => {
+    // Handle quoted fields
+    const result = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === delim && !inQ) { result.push(cur.trim()); cur = ''; }
+      else { cur += c; }
+    }
+    result.push(cur.trim());
+    return result;
+  });
+}
+
+// Column name patterns for auto-mapping
+const COL_PATTERNS = {
+  location:     [/所在地?/, /住所/, /address/i, /location/i],
+  type:         [/種別/, /物件種別/, /type/i],
+  layout:       [/間取/, /layout/i],
+  price:        [/価格/, /販売価格/, /成約価格/, /price/i],
+  buildArea:    [/建物面積/, /専有面積/, /建面/, /延床/],
+  landArea:     [/土地面積/, /地積/, /敷地/],
+  age:          [/築年/, /築年数/, /建築年/],
+  contractDate: [/成約年月/, /成約日/, /contract/i, /取引時点/],
+  station:      [/最寄駅?/, /駅/, /station/i],
+  walkMin:      [/徒歩/, /バス/, /walk/i],
+  layout2:      [/室数/],
+};
+
+function detectColumns(headers) {
+  const map = {};
+  headers.forEach((h, i) => {
+    const hn = h.trim();
+    for (const [key, patterns] of Object.entries(COL_PATTERNS)) {
+      if (!map[key] && patterns.some(p => p.test(hn))) {
+        map[key] = i;
+      }
+    }
+  });
+  return map;
+}
+
+function previewCSV() {
+  const text = document.getElementById('csv-input')?.value || '';
+  const info = document.getElementById('csv-preview-info');
+  const prev = document.getElementById('csv-preview');
+  if (!text.trim()) { if(info) info.textContent=''; if(prev) prev.innerHTML=''; return; }
+
+  const rows = parseCSVorTSV(text);
+  if (!rows.length) return;
+
+  // Detect if first row is header
+  const firstRow   = rows[0];
+  const isHeader   = firstRow.some(c => /[所在地種別間取価格面積年]/u.test(c) || /[a-zA-Z]/.test(c));
+  const headers    = isHeader ? firstRow : null;
+  const dataRows   = isHeader ? rows.slice(1) : rows;
+  const colMap     = headers ? detectColumns(headers) : {};
+
+  if (info) info.textContent = `${dataRows.length}件検出 / ${Object.keys(colMap).length}カラムマッピング済`;
+
+  if (prev) prev.innerHTML = `
+    <div style="font-size:10px;color:var(--text-muted);overflow-x:auto;max-height:120px;background:var(--bg);padding:8px;border-radius:6px;font-family:monospace">
+      ${dataRows.slice(0,5).map(r => r.slice(0,8).map(c=>`<span style="display:inline-block;min-width:80px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:top;padding-right:6px">${esc(c)}</span>`).join('')).join('<br>')}
+      ${dataRows.length>5?`<div style="color:var(--text-muted);margin-top:4px">…他${dataRows.length-5}件</div>`:''}
+    </div>`;
+}
+
+function importCSVData() {
+  const text    = document.getElementById('csv-input')?.value || '';
+  const source  = document.getElementById('csv-source')?.value || 'reins';
+  const status  = document.getElementById('csv-status')?.value || '成約';
+  const rows    = parseCSVorTSV(text);
+  if (!rows.length) { toast('データがありません','err'); return; }
+
+  const firstRow  = rows[0];
+  const isHeader  = firstRow.some(c => /[所在地種別間取価格面積年]/u.test(c) || /[a-zA-Z]/.test(c));
+  const headers   = isHeader ? firstRow : null;
+  const dataRows  = isHeader ? rows.slice(1) : rows;
+  const colMap    = headers ? detectColumns(headers) : {};
+
+  if (!D.marketData) D.marketData = [];
+  let importedCount = 0;
+  const dateStr = new Date().toLocaleDateString('ja-JP');
+
+  dataRows.forEach(row => {
+    if (row.every(c => !c.trim())) return; // skip empty rows
+    const g = (key, fallbackIdx) => {
+      const idx = colMap[key] !== undefined ? colMap[key] : fallbackIdx;
+      return idx !== undefined ? (row[idx]||'').trim() : '';
+    };
+
+    // Heuristic fallbacks when no header detected
+    const location   = g('location', 0);
+    const type       = g('type', 1) || '';
+    const layout     = g('layout', 2) || '';
+    const rawPrice   = g('price', 3).replace(/[^\d.]/g,'');
+    const buildAreaR = g('buildArea', 4).replace(/[^\d.]/g,'');
+    const landAreaR  = g('landArea', 5).replace(/[^\d.]/g,'');
+    const ageR       = g('age', 6).replace(/[^\d]/g,'');
+    const contractD  = g('contractDate', 7);
+    const station    = g('station', 8);
+    const walkR      = g('walkMin', 9).replace(/[^\d]/g,'');
+
+    if (!location) return;
+
+    const price     = parseFloat(rawPrice) || 0;
+    const buildArea = parseFloat(buildAreaR) || 0;
+    const landArea  = parseFloat(landAreaR)  || 0;
+    const age       = parseInt(ageR) || 0;
+    const walkMin   = parseInt(walkR) || 0;
+
+    const entry = {
+      id: uid(), source, status, location,
+      type, layout, price, contractDate: contractD,
+      buildArea, landArea, age, station, walkMin,
+      note: '', importedAt: Date.now(), importDate: dateStr,
+    };
+    calcMktUnit(entry);
+    D.marketData.push(entry);
+    importedCount++;
+  });
+
+  save(); closeModal();
+  toast(`${importedCount}件の市場データを取込みました`, 'ok');
+  renderMarket();
+}
+
+/* ══════════════════════════════════════════════
+   レインズ Chrome連携取込
+   ── 仕組み ──
+   1. ユーザーが自分でレインズにログインして検索結果を表示
+   2. このシステムとレインズが同じChromeで開いている状態で
+      Claudeに「レインズのデータを取込んで」と話しかける
+   3. ClaudeがChrome連携でレインズのページを読み取り→解析→localStorage注入
+   4. このシステムが自動リロードしてデータ反映
+══════════════════════════════════════════════ */
+function showReinsChrome() {
+  // Check if there's a pending import result in localStorage
+  const pending = localStorage.getItem('_reins_import_pending');
+  if (pending) {
+    try {
+      const data = JSON.parse(pending);
+      localStorage.removeItem('_reins_import_pending');
+      if (!D.marketData) D.marketData = [];
+      let count = 0;
+      (data.entries || []).forEach(e => {
+        calcMktUnit(e);
+        D.marketData.push(e);
+        count++;
+      });
+      save();
+      toast(`レインズから${count}件を取込みました ✅`, 'ok');
+      renderMarket();
+      return;
+    } catch(_) { localStorage.removeItem('_reins_import_pending'); }
+  }
+
+  showModal(`
+    <div class="modal" style="max-width:620px">
+      <div class="modal-hd">
+        <div>
+          <div class="modal-title">🔗 レインズ Chrome連携</div>
+          <div class="modal-subtitle">Claudeがレインズ画面を直接読み取ってデータを登録します</div>
+        </div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:10px;padding:16px;line-height:2;font-size:13px;color:#1a365d">
+          <div style="font-weight:700;font-size:14px;margin-bottom:8px">📋 操作手順（3ステップ）</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;gap:12px;align-items:flex-start">
+              <span style="background:#2c5282;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">1</span>
+              <div><strong>レインズにログイン</strong> → 物件検索（成約事例・現行物件）を実行<br><span style="font-size:11px;color:#2b6cb0">このシステムと同じChromeブラウザで開いてください</span></div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start">
+              <span style="background:#2c5282;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">2</span>
+              <div><strong>検索結果を表示した状態</strong>でClaudeのチャット欄に話しかける：<br>
+                <span style="background:#1a202c;color:#68d391;font-family:monospace;font-size:11px;padding:4px 10px;border-radius:6px;display:inline-block;margin-top:4px">「レインズの検索結果を取込んで」</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start">
+              <span style="background:#276749;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">3</span>
+              <div><strong>Claudeが自動取込</strong> → このシステムに戻るとデータが追加されています<br><span style="font-size:11px;color:#2b6cb0">「取込確認」ボタンで手動で反映することもできます</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#f0fff4;border:1px solid #9ae6b4;border-radius:8px;padding:12px;margin-top:14px;font-size:12px;color:#276749">
+          <strong>✅ 取込対象</strong>：一覧表示・詳細ページどちらでも対応。<br>
+          一覧で表示されている全件をAIが読み取り、所在地・価格・面積・成約年月・間取りを自動抽出します。
+        </div>
+
+        <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;margin-top:10px;font-size:11px;color:#92400e">
+          ⚠️ レインズの情報は会員規約上、外部への公開は禁止されています。<br>
+          このシステムはすべてローカル保存で外部送信しません。社内管理目的でのご利用はご自身の判断で。
+        </div>
+
+        <div style="margin-top:16px;padding:12px;border:1px solid var(--border);border-radius:8px">
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text-muted)">📥 取込確認（Claudeが注入済みの場合）</div>
+          <button class="btn btn-primary" onclick="checkReinsPending()" style="width:100%">✅ 取込データを確認・反映する</button>
+        </div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-secondary" onclick="closeModal()">閉じる</button>
+      </div>
+    </div>`);
+}
+
+function checkReinsPending() {
+  const pending = localStorage.getItem('_reins_import_pending');
+  if (!pending) {
+    toast('まだClaudeから取込データが届いていません', 'err');
+    return;
+  }
+  closeModal();
+  showReinsChrome(); // This will process the pending data
+}
+
+/* ── SUUMO Paste Import (URL + text extraction) ── */
+function showSuumoImport() {
+  showModal(`
+    <div class="modal" style="max-width:640px">
+      <div class="modal-hd">
+        <div>
+          <div class="modal-title">🔗 SUUMO / HOME'S テキスト取込</div>
+          <div class="modal-subtitle">ポータルサイトの物件テキストを貼り付けて登録</div>
+        </div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div style="background:#fff5f5;border:1px solid #feb2b2;border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;line-height:1.8;color:#c53030">
+          <strong>📋 SUUMO / HOME'S からのコピー手順</strong><br>
+          1. SUUMOで物件一覧を表示 → 物件情報をテキスト選択してコピー<br>
+          2. または物件詳細ページのテキストをコピー<br>
+          3. 下のエリアに貼り付け → AIが所在地・価格・面積を自動抽出
+        </div>
+        <div class="form-group">
+          <label>情報源</label>
+          <select id="paste-source" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;width:auto">
+            <option value="suumo">SUUMO</option>
+            <option value="homes">HOME'S</option>
+            <option value="manual">その他ポータル</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>貼り付けテキスト</label>
+          <textarea id="paste-input" placeholder="SUUMOやHOME'Sからコピーした物件テキストを貼り付け…&#10;&#10;例：&#10;横浜市青葉区 3LDK 4,480万円 83.25㎡ 築8年 たまプラーザ徒歩7分&#10;..." style="min-height:160px;font-size:12px"></textarea>
+        </div>
+        <div id="paste-preview" style="margin-top:8px;font-size:11px;color:var(--text-muted)"></div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="importPastedData()">取込（AI解析）</button>
+      </div>
+    </div>`);
+}
+
+async function importPastedData() {
+  const text   = (document.getElementById('paste-input')?.value||'').trim();
+  const source = document.getElementById('paste-source')?.value || 'suumo';
+  if (!text) { toast('テキストを貼り付けてください','err'); return; }
+
+  const cfg = getCfg();
+  if (!cfg.apiKey) {
+    // Fallback: simple line-by-line parsing
+    importPastedFallback(text, source); return;
+  }
+
+  // Use AI to extract structured data
+  const prev = document.getElementById('paste-preview');
+  if (prev) prev.innerHTML = '<span style="color:var(--primary)">⏳ AIが解析中…</span>';
+
+  const PROMPT = `以下の不動産物件テキストから物件情報を抽出してください。
+複数物件がある場合はすべて配列で返してください。
+
+テキスト:
+${text.slice(0, 3000)}
+
+必ずJSON配列のみで返答してください（説明不要）:
+[
+  {
+    "location": "所在地（都道府県から）",
+    "type": "種別（マンション/一戸建て/土地/アパート/その他）",
+    "layout": "間取り（例：3LDK）またはnull",
+    "price": 価格（万円の整数、不明ならnull）,
+    "buildArea": 建物面積（㎡の数値、なければnull）,
+    "landArea": 土地面積（㎡の数値、なければnull）,
+    "age": 築年数（整数、なければnull）,
+    "station": "最寄り駅（なければnull）",
+    "walkMin": 駅徒歩分数（整数、なければnull）
+  }
+]`;
+
+  try {
+    let txt = '';
+    if (cfg.provider === 'claude') {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method:'POST',
+        headers:{'x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-dangerous-direct-browser-access':'true'},
+        body: JSON.stringify({ model: cfg.model||'claude-3-5-haiku-20241022', max_tokens:2048, messages:[{role:'user',content:PROMPT}] })
+      });
+      const d = await res.json(); txt = d.content?.[0]?.text||'';
+    } else {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${cfg.model||'gemini-2.0-flash-lite'}:generateContent?key=${cfg.apiKey}`,{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({contents:[{parts:[{text:PROMPT}]}],generationConfig:{temperature:0.1,maxOutputTokens:2048,responseMimeType:'application/json'}})
+      });
+      const d = await res.json(); txt = d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    }
+    const cleaned = txt.replace(/```(?:json)?\s*/gi,'').replace(/```/g,'').trim();
+    const match = cleaned.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error('配列が見つかりません');
+    const items = JSON.parse(match[0]);
+    if (!D.marketData) D.marketData = [];
+    const dateStr = new Date().toLocaleDateString('ja-JP');
+    let count = 0;
+    items.forEach(item => {
+      if (!item.location) return;
+      const entry = {
+        id: uid(), source, status:'販売中',
+        location: item.location||'', type: item.type||'', layout: item.layout||'',
+        price: parseFloat(item.price)||0, buildArea: parseFloat(item.buildArea)||0,
+        landArea: parseFloat(item.landArea)||0, age: parseInt(item.age)||0,
+        station: item.station||'', walkMin: parseInt(item.walkMin)||0,
+        note:'', importedAt: Date.now(), importDate: dateStr,
+      };
+      calcMktUnit(entry);
+      D.marketData.push(entry);
+      count++;
+    });
+    save(); closeModal();
+    toast(`${count}件を取込みました（AI解析）`, 'ok');
+    renderMarket();
+  } catch(e) {
+    console.error(e);
+    if (prev) prev.innerHTML = '<span style="color:var(--danger)">AI解析失敗。フォールバック解析を試みます…</span>';
+    setTimeout(() => importPastedFallback(text, source), 500);
+  }
+}
+
+function importPastedFallback(text, source) {
+  // Simple regex-based extraction for common patterns
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 5);
+  if (!D.marketData) D.marketData = [];
+  let count = 0;
+  const dateStr = new Date().toLocaleDateString('ja-JP');
+
+  lines.forEach(line => {
+    const priceM = line.match(/(\d{1,5}[,.]\d{3}|\d{3,5})\s*万/);
+    const areaM  = line.match(/(\d{1,4}\.?\d*)\s*㎡/);
+    const locM   = line.match(/([都道府県]|[市区町村].{2,15}[丁目番地号])/);
+    if (!priceM && !locM) return;
+    const entry = {
+      id: uid(), source, status:'販売中',
+      location: locM?locM[0]:'', type:'', layout:'',
+      price: priceM ? parseFloat(priceM[1].replace(',','')) : 0,
+      buildArea: areaM ? parseFloat(areaM[1]) : 0,
+      landArea: 0, age:0, station:'', walkMin:0,
+      note: line.slice(0,100), importedAt: Date.now(), importDate: dateStr,
+    };
+    calcMktUnit(entry);
+    D.marketData.push(entry);
+    count++;
+  });
+  save(); closeModal();
+  toast(`${count}件を取込みました（簡易解析）`, 'ok');
+  renderMarket();
+}
+
+/* ══════════════════════════════════════════════
    DASHBOARD
 ══════════════════════════════════════════════ */
 function renderDash() {
   const P   = D.properties;
+  const MD  = D.marketData || [];
   const cnt = s => P.filter(p => (p.status||'未提案') === s).length;
-  const STATUSES = ['未提案','検討中','申込中','成約','見送り'];
+  const catCnt = c => P.filter(p => p.category === c).length;
+  const ALL_STATUSES = [...new Set(P.map(p => p.status||'未提案'))];
 
   const cpMap = {};
   P.forEach(p => (p.custIds||[]).forEach(id => { cpMap[id] = (cpMap[id]||0)+1; }));
@@ -2177,16 +4339,16 @@ function renderDash() {
       <div class="stat-card">
         <div class="stat-label">総物件数</div>
         <div class="stat-value" style="color:var(--primary)">${P.length}</div>
-        <div class="stat-sub">件登録済み</div>
+        <div class="stat-sub">売買${catCnt('売買')} / 賃貸${catCnt('賃貸')} / 収益${catCnt('収益')}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">検討中</div>
-        <div class="stat-value" style="color:#2b6cb0">${cnt('検討中')}</div>
+        <div class="stat-label">販売活動中</div>
+        <div class="stat-value" style="color:#c05621">${P.filter(p=>['販売活動中','募集中','売却検討'].includes(p.status)).length}</div>
         <div class="stat-sub">件</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">申込中</div>
-        <div class="stat-value" style="color:#c05621">${cnt('申込中')}</div>
+        <div class="stat-value" style="color:#744210">${cnt('申込中')}</div>
         <div class="stat-sub">件</div>
       </div>
       <div class="stat-card">
@@ -2194,16 +4356,22 @@ function renderDash() {
         <div class="stat-value" style="color:var(--success)">${cnt('成約')}</div>
         <div class="stat-sub">件</div>
       </div>
+      <div class="stat-card" style="cursor:pointer" onclick="nav('market')">
+        <div class="stat-label">市場データ</div>
+        <div class="stat-value" style="color:#553c9a">${MD.length}</div>
+        <div class="ms-sub" style="font-size:10px;color:var(--text-muted)">件取込済 →分析へ</div>
+      </div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div class="card">
         <div class="card-header">ステータス別内訳</div>
         <div style="padding:14px 16px">
-          ${STATUSES.map(s => {
+          ${ALL_STATUSES.map(s => {
             const n = cnt(s);
+            if (!n) return '';
             return `<div class="prog-row">
-              <span class="badge badge-${s}" style="min-width:60px;text-align:center">${s}</span>
+              <span class="badge badge-${s}" style="min-width:70px;text-align:center">${s}</span>
               <div class="prog-bar"><div class="prog-fill" style="width:${P.length?n/P.length*100:0}%"></div></div>
               <span style="font-size:13px;font-weight:700;min-width:24px;text-align:right">${n}</span>
             </div>`;
@@ -2270,6 +4438,7 @@ function onImport(e) {
     try {
       const d = JSON.parse(ev.target.result);
       if (!d.properties || !d.customers || !d.agents) { toast('無効なデータ形式です', 'err'); return; }
+      if (!d.marketData) d.marketData = [];
       if (confirm('既存データを上書きして読み込みますか？\n（PDFデータは引き継がれません）')) {
         D = d; save(); render(); toast('データを読み込みました', 'ok');
       }
