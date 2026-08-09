@@ -8,6 +8,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
     :root {
       --primary: #1a3a5c;
@@ -386,6 +388,37 @@
 
     /* ── Seller Page Button ── */
     .seller-btn { background:linear-gradient(135deg,#1a3a5c,#2c5282); color:#fff; }
+
+    /* ── Obi Tool ── */
+    .obi-steps-row{display:flex;gap:10px;margin-bottom:18px;align-items:center;flex-wrap:wrap}
+    .obi-pill{display:flex;align-items:center;gap:5px;padding:5px 13px;border-radius:999px;font-size:11px;font-weight:600;background:white;border:1.5px solid var(--border);color:var(--text-muted);transition:all .2s}
+    .obi-pill.active{background:#ebf8ff;border-color:var(--info);color:var(--info)}
+    .obi-pill.done{background:#f0fff4;border-color:#68d391;color:#276749}
+    .obi-n{width:18px;height:18px;border-radius:50%;background:var(--border);color:var(--text-muted);display:flex;align-items:center;justify-content:center;font-size:10px}
+    .obi-pill.active .obi-n{background:var(--info);color:white}
+    .obi-pill.done .obi-n{background:#68d391;color:white}
+    .obi-drop{border:2px dashed #bee3f8;border-radius:10px;padding:24px 14px;text-align:center;cursor:pointer;transition:all .2s;background:#ebf8ff;min-height:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+    .obi-drop:hover,.obi-drop.over{border-color:var(--info);background:#dbeafe}
+    .obi-drop p{font-size:13px;color:var(--text);font-weight:500}
+    .obi-drop small{font-size:11px;color:var(--text-muted)}
+    .obi-navbtn{padding:4px 12px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;transition:all .15s;white-space:nowrap}
+    .obi-navbtn:hover:not(:disabled){border-color:var(--info);color:var(--info);background:#ebf8ff}
+    .obi-navbtn:disabled{opacity:.35;cursor:not-allowed}
+    .obi-dot{min-width:20px;height:20px;padding:0 3px;border-radius:10px;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;border:2px solid transparent}
+    .obi-dot-p{background:#f0f4f8;color:var(--text-muted);border-color:var(--border)}
+    .obi-dot-h{background:#f0fff4;color:#276749;border-color:#9ae6b4}
+    .obi-dot-m{background:#fffbeb;color:#744210;border-color:#fcd34d}
+    .obi-dot-l{background:#fff5f5;color:#c53030;border-color:#fc8181}
+    .obi-dot-u{background:#ebf8ff;color:var(--info);border-color:#90cdf4}
+    .obi-dot-cur{border-color:var(--info) !important;box-shadow:0 0 0 2px rgba(49,130,206,.3);transform:scale(1.12)}
+    .obi-sb{flex:1;padding:6px;border:none;background:white;font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s}
+    .obi-sb.on{background:var(--primary);color:white;font-weight:700}
+    .obi-pi{display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:6px;font-size:12px;cursor:pointer;transition:background .15s;border:1.5px solid transparent}
+    .obi-pi:hover{background:var(--bg)}
+    .obi-pi.sel{background:#ebf8ff;border-color:#bee3f8}
+    .obi-ri{font-size:12px;padding:4px 9px;border-radius:5px;display:flex;align-items:center;gap:5px}
+    .obi-ri.obi-ok{background:#f0fff4;color:#276749}
+    .obi-ri.obi-ng{background:#fff5f5;color:#c53030}
   </style>
 </head>
 <body>
@@ -417,6 +450,13 @@
     <div class="nav-item" data-view="dash"   onclick="nav('dash')">
       <span class="nav-icon">📊</span><span>ダッシュボード</span>
     </div>
+    <div class="nav-item" data-view="ledger" onclick="nav('ledger')">
+      <span class="nav-icon">📒</span><span>取引台帳</span>
+      <span class="nav-badge" id="nb-ledger">0</span>
+    </div>
+    <div class="nav-item" data-view="obi" onclick="nav('obi')">
+      <span class="nav-icon">🏷️</span><span>帯替えツール</span>
+    </div>
   </nav>
   <div class="sidebar-footer">
     <button class="btn btn-accent btn-sm"     onclick="showSettings()">✨ AI自動入力設定</button>
@@ -440,6 +480,194 @@
     <button class="btn btn-accent" id="add-btn" onclick="onAdd()">＋ 新規登録</button>
   </div>
   <div class="content" id="cnt"></div>
+  <div id="obi-wrap" style="display:none;flex:1;overflow-y:auto;flex-direction:column;background:var(--bg)">
+    <div style="max-width:1240px;margin:0 auto;padding:20px;width:100%">
+
+      <!-- Steps indicator -->
+      <div class="obi-steps-row">
+        <div class="obi-pill active" id="o-pill1"><div class="obi-n">1</div>帯画像を設定</div>
+        <span style="color:#cbd5e0">▶</span>
+        <div class="obi-pill" id="o-pill2"><div class="obi-n">2</div>PDFを追加</div>
+        <span style="color:#cbd5e0">▶</span>
+        <div class="obi-pill" id="o-pill3"><div class="obi-n">3</div>自動検出・微調整</div>
+        <span style="color:#cbd5e0">▶</span>
+        <div class="obi-pill" id="o-pill4"><div class="obi-n">4</div>一括処理</div>
+      </div>
+
+      <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:9px 13px;font-size:12px;color:#744210;margin-bottom:16px;display:flex;gap:7px">
+        💡 <span>全処理はブラウザ内のみ完結。PDFや画像は外部送信されません。</span>
+      </div>
+
+      <!-- STEP 1 & 2 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div class="card" style="padding:20px">
+          <div class="card-header" style="margin:-20px -20px 14px;padding:12px 16px">🏷️ STEP 1｜自社の帯を設定</div>
+          <div class="obi-drop" id="o-bandDrop" onclick="obi$('bandIn').click()">
+            <div style="font-size:26px">🖼️</div>
+            <p>クリックして帯画像を選択</p>
+            <small>PNG・JPG（帯の縦横比がそのまま反映されます）</small>
+          </div>
+          <input type="file" id="o-bandIn" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="display:none">
+          <div id="o-bprev" style="display:none;margin-top:11px">
+            <div style="border:1px solid var(--border);border-radius:7px;overflow:hidden">
+              <img id="o-bimg" src="" alt="" style="width:100%;display:block;max-height:90px;object-fit:cover">
+            </div>
+            <div id="o-bmeta" style="font-size:11px;color:var(--text-muted);padding:4px 9px;background:var(--bg);border-top:1px solid var(--border)"></div>
+            <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#f0fff4;color:#276749;border:1px solid #9ae6b4;margin-top:9px">✅ 帯画像を設定済み</span>
+          </div>
+        </div>
+
+        <div class="card" style="padding:20px">
+          <div class="card-header" style="margin:-20px -20px 14px;padding:12px 16px">📄 STEP 2｜販売図面PDFを追加</div>
+          <div class="obi-drop" id="o-pdfDrop" onclick="obi$('pdfIn').click()">
+            <div style="font-size:26px">📑</div>
+            <p>クリックしてPDFを選択</p>
+            <small>複数選択可 / ドラッグ＆ドロップ対応</small>
+          </div>
+          <input type="file" id="o-pdfIn" accept=".pdf,application/pdf" multiple style="display:none">
+          <div id="o-plist" style="margin-top:9px;max-height:210px;overflow-y:auto;display:flex;flex-direction:column;gap:2px">
+            <div style="font-size:12px;color:var(--text-muted);text-align:center;padding:18px 0">PDFがまだ追加されていません</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:7px">
+            <span id="o-pcount" style="font-size:12px;color:var(--text-muted)"></span>
+            <span id="o-addmore" style="display:none;font-size:11px;color:var(--info);cursor:pointer;text-decoration:underline" onclick="obi$('pdfIn').click()">＋ さらに追加</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="card" id="o-prevCard" style="display:none;padding:20px;margin-bottom:16px">
+        <div class="card-header" style="margin:-20px -20px 14px;padding:12px 16px">🔍 STEP 3｜自動検出 ＆ 微調整</div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
+          各ページの帯を自動検出します。<strong>信頼度が低いページのみ</strong>赤く表示されます。赤い線をドラッグして微調整できます。
+        </p>
+
+        <div id="o-lcAlert" style="display:none;background:#fff5f5;border:1px solid #fc8181;border-radius:8px;padding:9px 13px;font-size:12px;color:#c53030;margin-bottom:10px;align-items:center;gap:8px">
+          ⚠️ <span id="o-lcMsg"></span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start">
+          <!-- Left: canvas -->
+          <div>
+            <div id="o-pfname" style="font-size:11px;color:var(--text-muted);margin-bottom:6px"></div>
+
+            <!-- Page nav -->
+            <div id="o-pnav" style="display:none;align-items:center;gap:8px;margin-bottom:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 11px">
+              <button class="obi-navbtn" id="o-btnP" onclick="obiNavPage(-1)" disabled>◀ 前</button>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="font-size:11px;font-weight:700;color:var(--text)" id="o-pgind">1 / 1 ページ</div>
+                <div id="o-dots" style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:260px"></div>
+              </div>
+              <button class="obi-navbtn" id="o-btnN" onclick="obiNavPage(1)" disabled>次 ▶</button>
+            </div>
+
+            <div id="o-cwrap" style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#edf2f7;line-height:0;user-select:none">
+              <canvas id="o-pc" style="display:block;width:100%;height:auto"></canvas>
+              <div id="o-cline" style="position:absolute;left:0;right:0;height:2px;background:#e53e3e;cursor:ns-resize;z-index:20;filter:drop-shadow(0 0 3px rgba(229,62,62,.7))">
+                <span id="o-clabel" style="position:absolute;right:6px;background:#e53e3e;color:white;font-size:10px;padding:2px 6px;border-radius:3px;pointer-events:none;font-weight:600;white-space:nowrap">▲ 帯の上端（ドラッグで調整）</span>
+              </div>
+              <div id="o-bovl" style="position:absolute;left:0;right:0;pointer-events:none;z-index:10;overflow:hidden;background:rgba(229,62,62,.06);border-top:1.5px dashed rgba(229,62,62,.4)">
+                <img id="o-bovlImg" src="" alt="" style="position:absolute;opacity:.65">
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: controls -->
+          <div>
+            <!-- Confidence -->
+            <div id="o-confBadge" style="display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:7px;font-size:11px;font-weight:600;margin-bottom:12px;background:#ebf8ff;color:#2b6cb0;border:1px solid #bee3f8">
+              <span id="o-confIcon">⏳</span>
+              <div style="flex:1">
+                <div id="o-confMsg">検出中...</div>
+                <div style="background:#e2e8f0;border-radius:99px;height:5px;overflow:hidden;margin-top:4px">
+                  <div id="o-cbarf" style="height:5px;border-radius:99px;transition:width .4s;width:0%"></div>
+                </div>
+              </div>
+              <span id="o-confPct" style="font-size:13px;font-weight:800"></span>
+            </div>
+
+            <!-- Band position -->
+            <div style="margin-bottom:14px">
+              <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px">帯の位置</div>
+              <div style="display:flex;border:1.5px solid var(--border);border-radius:7px;overflow:hidden">
+                <button class="obi-sb on" id="o-bB" onclick="obiSetPos('bottom')">下部（一般的）</button>
+                <button class="obi-sb" id="o-bT" onclick="obiSetPos('top')">上部</button>
+              </div>
+            </div>
+
+            <!-- Cut slider -->
+            <div style="margin-bottom:14px">
+              <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px;display:flex;justify-content:space-between">
+                カット位置（白塗り範囲）<span style="color:var(--primary);font-size:13px;font-weight:700" id="o-cutVal">15%</span>
+              </div>
+              <input type="range" id="o-cutSlider" min="3" max="45" value="15" oninput="obiOnCutSlider(this.value)" style="width:100%;accent-color:var(--primary)">
+              <div style="font-size:10px;color:var(--text-muted);margin-top:3px">赤い線をドラッグするか、スライダーで微調整</div>
+            </div>
+
+            <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+
+            <!-- Width slider -->
+            <div style="margin-bottom:14px">
+              <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px;display:flex;justify-content:space-between">
+                自社帯の横幅 <span style="color:var(--primary);font-size:13px;font-weight:700" id="o-wVal">100%</span>
+              </div>
+              <input type="range" id="o-wSlider" min="40" max="100" value="100" oninput="obiOnWidthSlider(this.value)" style="width:100%;accent-color:var(--primary)">
+            </div>
+
+            <!-- Alignment -->
+            <div style="margin-bottom:14px">
+              <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px">横位置</div>
+              <div style="display:flex;border:1.5px solid var(--border);border-radius:7px;overflow:hidden">
+                <button class="obi-sb on" id="o-aL" onclick="obiSetAlign(0)">左揃え</button>
+                <button class="obi-sb" id="o-aC" onclick="obiSetAlign(0.5)">中央</button>
+                <button class="obi-sb" id="o-aR" onclick="obiSetAlign(1)">右揃え</button>
+              </div>
+            </div>
+
+            <!-- Vertical slider -->
+            <div style="margin-bottom:14px">
+              <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px;display:flex;justify-content:space-between">
+                帯の縦位置（カット範囲内）<span style="color:var(--primary);font-size:13px;font-weight:700" id="o-vVal">ページ端</span>
+              </div>
+              <input type="range" id="o-vSlider" min="0" max="100" value="0" oninput="obiOnVertSlider(this.value)" style="width:100%;accent-color:var(--primary)">
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:2px">
+                <span>ページ端</span><span>カット位置</span>
+              </div>
+            </div>
+
+            <button class="btn btn-secondary" style="width:100%;margin-bottom:5px" onclick="obiReDetect()">🔄 このページを再検出</button>
+            <button class="btn btn-secondary" id="o-applyAllBtn" style="display:none;width:100%" onclick="obiApplyAll()">✅ この設定を全ページに適用</button>
+
+            <!-- Mini preview -->
+            <div style="margin-top:15px">
+              <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px">帯替え後プレビュー</div>
+              <div style="border:1px solid var(--border);border-radius:7px;overflow:hidden;line-height:0">
+                <canvas id="o-mc" style="display:block;width:100%;height:auto"></canvas>
+              </div>
+              <div style="font-size:10px;color:var(--text-muted);text-align:center;padding:3px;background:var(--bg)">置換後イメージ（縮小表示）</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4 -->
+      <div class="card" id="o-procCard" style="display:none;padding:20px">
+        <div class="card-header" style="margin:-20px -20px 14px;padding:12px 16px">⚡ STEP 4｜一括処理・ダウンロード</div>
+        <button class="btn btn-primary" id="o-procBtn" onclick="obiStartProc()" style="width:100%;padding:13px;font-size:14px;justify-content:center">⚡ 全PDFを帯替えして出力</button>
+        <div id="o-pwrap" style="display:none;margin-top:12px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text);margin-bottom:4px">
+            <span id="o-plbl">処理中...</span><span id="o-pcnt"></span>
+          </div>
+          <div style="background:var(--border);border-radius:99px;height:7px">
+            <div id="o-pbar" style="background:linear-gradient(90deg,var(--primary),var(--info));height:7px;border-radius:99px;transition:width .3s;width:0%"></div>
+          </div>
+        </div>
+        <button id="o-dbtn" onclick="obiDoDownload()" style="display:none;width:100%;padding:12px;border:none;border-radius:9px;background:linear-gradient(135deg,#276749,#38a169);color:white;font-size:14px;font-weight:700;cursor:pointer;align-items:center;justify-content:center;gap:8px;transition:all .2s;font-family:inherit;margin-top:12px">⬇️ ダウンロード（処理済みPDF）</button>
+        <div id="o-rlist" style="margin-top:10px;max-height:170px;overflow-y:auto;display:flex;flex-direction:column;gap:2px"></div>
+      </div>
+
+    </div>
+  </div>
 </div>
 
 <div class="toast-wrap" id="toasts"></div>
@@ -721,11 +949,14 @@ function loadData() {
     const r = localStorage.getItem(LS);
     if (r) {
       const d = JSON.parse(r);
-      if (!d.marketData) d.marketData = [];
+      if (!d.marketData)   d.marketData   = [];
+      if (!d.transactions) d.transactions = [];
+      if (!d.tasks)        d.tasks        = [];
+      if (!d.checklists)   d.checklists   = {};
       return d;
     }
   } catch(_) {}
-  return { properties: [], customers: [], agents: [], marketData: [] };
+  return { properties: [], customers: [], agents: [], marketData: [], transactions: [], tasks: [], checklists: {} };
 }
 function save() { localStorage.setItem(LS, JSON.stringify(D)); refreshBadges(); if (sbClient) sbPush(); }
 
@@ -768,6 +999,8 @@ function refreshBadges() {
   document.getElementById('nb-agents').textContent = D.agents.length;
   const nb = document.getElementById('nb-market');
   if (nb) nb.textContent = (D.marketData||[]).length;
+  const nbl = document.getElementById('nb-ledger');
+  if (nbl) nbl.textContent = (D.transactions||[]).length;
 }
 
 /* ══════════════════════════════════════════════
@@ -798,21 +1031,39 @@ let mktCity = ''; // 相場分析の市区町村フィルター
 let mktType = ''; // 種別フィルター（''=全て, '一戸建て', 'マンション', '土地', 'アパート'）
 let mktPage = 0;  // データ一覧 現在ページ（0始まり）
 const MKT_PAGE_SIZE = 50;
+let dashMonthOffset = 0; // 月別グラフ：0=現在, 6=半年前, 12=1年前…
 
 function nav(v) {
   view = v;
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === v));
-  const titles = { props:'物件一覧', custs:'顧客管理', agents:'業者管理', market:'市場データ', dash:'ダッシュボード' };
+  const titles = { props:'物件一覧', custs:'顧客管理', agents:'業者管理', market:'市場データ', dash:'ダッシュボード', ledger:'取引台帳', obi:'帯替えツール' };
   document.getElementById('pg-title').textContent = titles[v] || v;
-  document.getElementById('srch').value = ''; q = '';
-  // Update add button label
+
+  // Toggle obi panel vs normal content
+  const obiWrap = document.getElementById('obi-wrap');
+  const cnt = document.getElementById('cnt');
   const addBtn = document.getElementById('add-btn');
-  if (addBtn) addBtn.textContent = v === 'market' ? '＋ 物件を登録' : '＋ 新規登録';
-  render();
+  const srchWrap = document.querySelector('.search-wrap');
+
+  if (v === 'obi') {
+    cnt.style.display = 'none';
+    obiWrap.style.display = 'flex';
+    if (addBtn) addBtn.style.display = 'none';
+    if (srchWrap) srchWrap.style.display = 'none';
+  } else {
+    cnt.style.display = '';
+    obiWrap.style.display = 'none';
+    if (addBtn) addBtn.style.display = '';
+    if (srchWrap) srchWrap.style.display = '';
+    document.getElementById('srch').value = ''; q = '';
+    const addLabels = { market:'＋ 物件を登録', ledger:'＋ 新規入力' };
+    if (addBtn) addBtn.textContent = addLabels[v] || '＋ 新規登録';
+    render();
+  }
 }
 function onSearch() { q = document.getElementById('srch').value.toLowerCase(); render(); }
-function onAdd()    { const m = { props:'showPropModal', custs:'showCustModal', agents:'showAgentModal', dash:'showPropModal', market:'showMarketEntry' }; window[m[view]]?.(); }
-function render()   { const m = { props:renderProps, custs:renderCusts, agents:renderAgents, dash:renderDash, market:renderMarket }; m[view]?.(); }
+function onAdd()    { const m = { props:'showPropModal', custs:'showCustModal', agents:'showAgentModal', dash:'showPropModal', market:'showMarketEntry', ledger:'showLedgerModal' }; window[m[view]]?.(); }
+function render()   { const m = { props:renderProps, custs:renderCusts, agents:renderAgents, dash:renderDash, market:renderMarket, ledger:renderLedger }; m[view]?.(); }
 
 /* ══════════════════════════════════════════════
    SETTINGS MODAL
@@ -1608,6 +1859,46 @@ async function showPropDetail(id) {
               </div>
               <div id="nearby-comps" style="margin-top:6px;font-size:11px;color:var(--text-muted)">ボタンを押してエリア内の事例を表示</div>
             </div>
+
+            <!-- AI活用パネル -->
+            <div class="detail-sec">
+              <div class="detail-sec-title">🤖 AI活用</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+                <button class="btn btn-secondary btn-sm" style="justify-content:center" onclick="genAppraisalPrompt('${p.id}')">📋 査定プロンプト</button>
+                <button class="btn btn-secondary btn-sm" style="justify-content:center" onclick="genCompetitorPrompt('${p.id}')">🔍 競合分析プロンプト</button>
+                <button class="btn btn-secondary btn-sm" style="justify-content:center" onclick="genSnsPrompt('${p.id}')">📣 SNS投稿生成プロンプト</button>
+                <button class="btn btn-secondary btn-sm" style="justify-content:center" onclick="showDocChecklist('${p.id}')">📋 書類チェックリスト</button>
+              </div>
+            </div>
+
+            <!-- タスク管理 -->
+            <div class="detail-sec">
+              <div class="detail-sec-title" style="display:flex;align-items:center;gap:6px">
+                ✅ タスク管理
+                <button class="btn btn-xs btn-primary" onclick="showTaskModal('${p.id}')" style="margin-left:auto">＋ 追加</button>
+              </div>
+              <div id="task-list-${p.id}">
+                ${(()=>{
+                  const tasks = (D.tasks||[]).filter(t=>t.propId===p.id).sort((a,b)=>{ const pa={高:0,中:1,低:2}; return (pa[a.priority]||1)-(pa[b.priority]||1); });
+                  if (!tasks.length) return '<div style="font-size:11px;color:var(--text-muted)">タスクなし</div>';
+                  const now = Date.now();
+                  return tasks.map(t => {
+                    const due = t.dueDate ? new Date(t.dueDate).getTime() : null;
+                    const overdue = due && !t.done && due < now;
+                    const pc = {高:'#e53e3e',中:'#dd6b20',低:'#718096'};
+                    return '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
+                      + '<input type="checkbox"' + (t.done?' checked':'') + ' onchange="toggleTask(\''+t.id+'\')" style="margin-top:2px;cursor:pointer">'
+                      + '<div style="flex:1;min-width:0">'
+                      + '<div style="font-size:12px;' + (t.done?'text-decoration:line-through;color:var(--text-muted)':'') + '">' + esc(t.content) + '</div>'
+                      + (t.dueDate?'<div style="font-size:10px;color:'+(overdue?'#e53e3e':'var(--text-muted)')+'">'+(overdue?'⚠ 期限超過: ':'期限: ')+t.dueDate+'</div>':'')
+                      + '</div>'
+                      + '<span style="font-size:10px;font-weight:700;color:'+( pc[t.priority]||'#718096' )+'">' + esc(t.priority||'低') + '</span>'
+                      + '<button onclick="delTask(\''+t.id+'\',\''+p.id+'\')" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:12px">✕</button>'
+                      + '</div>';
+                  }).join('');
+                })()}
+              </div>
+            </div>
           </div>
           <div>
             <div class="detail-sec-title" style="margin-bottom:8px">📄 販売図面</div>
@@ -2400,11 +2691,12 @@ function renderCusts() {
     <div class="tbl-wrap"><table>
     <thead><tr>
       <th>源泉</th><th>顧客名</th><th>電話番号</th><th>メール</th>
-      <th>担当者</th><th>ランク</th><th>提案件数</th><th>登録日</th><th></th>
+      <th>担当者</th><th>ランク</th><th>状況</th><th>提案件数</th><th>登録日</th><th></th>
     </tr></thead><tbody>`;
 
+  const CUST_STATUS_COLOR = {'申込':'#c05621','成約':'#276749','媒介契約':'#2c5282','検討中':'#553c9a','見送り':'#718096'};
   if (!list.length) {
-    h += `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">
+    h += `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted)">
       <div style="font-size:32px;margin-bottom:8px">👤</div>
       顧客が登録されていません<br>
       <span style="font-size:12px">「＋ 新規登録」または「いえらぶ Chrome連携」から追加してください</span>
@@ -2419,6 +2711,10 @@ function renderCusts() {
     const rank = c.rank
       ? `<span style="background:${rankClr};color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px">${esc(c.rank)}</span>`
       : '<span style="color:var(--text-muted);font-size:11px">-</span>';
+    const stClr = CUST_STATUS_COLOR[c.custStatus] || '';
+    const statusBadge = c.custStatus
+      ? `<span style="background:${stClr};color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap">${esc(c.custStatus)}</span>`
+      : '<span style="color:var(--text-muted);font-size:11px">-</span>';
     h += `<tr onclick="filterByCust('${c.id}')" style="cursor:pointer">
       <td>${src}</td>
       <td>
@@ -2432,6 +2728,7 @@ function renderCusts() {
       <td style="font-size:11px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.email||'-')}</td>
       <td style="font-size:12px">${esc(c.agent||'-')}</td>
       <td>${rank}</td>
+      <td>${statusBadge}</td>
       <td><span style="background:var(--primary);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px">${cnt}件</span></td>
       <td style="font-size:11px;color:var(--text-muted);white-space:nowrap">${c.ts?new Date(c.ts).toLocaleDateString('ja-JP'):'-'}</td>
       <td onclick="event.stopPropagation()">
@@ -2467,6 +2764,12 @@ function showCustModal(editId = '') {
             <label>ランク</label>
             <select id="c-rank">
               ${['','A','B','C','D'].map(r=>`<option value="${r}" ${(c?.rank||'')===r?'selected':''}>${r||'なし'}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="flex:1.4">
+            <label>状況</label>
+            <select id="c-status">
+              ${['','申込','成約','媒介契約','検討中','見送り'].map(s=>`<option value="${s}" ${(c?.custStatus||'')===s?'selected':''}>${s||'---'}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -2522,7 +2825,8 @@ function saveCust(editId) {
     email:    document.getElementById('c-email').value.trim(),
     address:  document.getElementById('c-address').value.trim(),
     agent:    document.getElementById('c-agent').value.trim(),
-    rank:     document.getElementById('c-rank').value,
+    rank:       document.getElementById('c-rank').value,
+    custStatus: document.getElementById('c-status').value,
     ierabuId: document.getElementById('c-ierabu-id').value.trim(),
     notes:    document.getElementById('c-notes').value.trim(),
   };
@@ -4318,6 +4622,8 @@ function importPastedFallback(text, source) {
 function renderDash() {
   const P   = D.properties;
   const MD  = D.marketData || [];
+  const TX  = D.transactions || [];
+  const TK  = D.tasks || [];
   const cnt = s => P.filter(p => (p.status||'未提案') === s).length;
   const catCnt = c => P.filter(p => p.category === c).length;
   const ALL_STATUSES = [...new Set(P.map(p => p.status||'未提案'))];
@@ -4333,6 +4639,58 @@ function renderDash() {
   });
   const topAgents = Object.entries(apMap).sort(([,a],[,b])=>b-a).slice(0,5);
   const recent    = [...P].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,6);
+
+  // 月別グラフ用データ（半年単位・さかのぼり対応）
+  const now = new Date();
+  // 最古データ判定（物件 or 取引台帳の最古日）
+  const allTs = [
+    ...P.map(p=>p.ts||0),
+    ...TX.map(t=>t.tradeDate?new Date(t.tradeDate.replace(/-/g,'/')).getTime():0)
+  ].filter(t=>t>0);
+  const oldestTs = allTs.length ? Math.min(...allTs) : Date.now();
+  const oldestDate = new Date(oldestTs);
+  // 現在表示の開始月（offset月前を基点に6ヶ月）
+  const months = [];
+  for (let i=5; i>=0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-dashMonthOffset-i, 1);
+    months.push({ year: d.getFullYear(), month: d.getMonth(), label: d.getFullYear()+'/'+(d.getMonth()+1) });
+  }
+  const canGoPrev = new Date(now.getFullYear(), now.getMonth()-dashMonthOffset-6, 1) >= new Date(oldestDate.getFullYear(), oldestDate.getMonth(), 1);
+  const canGoNext = dashMonthOffset > 0;
+  const monthKey = (ts) => { const d=new Date(ts); return d.getFullYear()*100+d.getMonth(); };
+  const monthData = months.map(m => {
+    const key = m.year*100+m.month;
+    const propCount = P.filter(p=>p.status==='成約' && monthKey(p.ts||0)===key).length;
+    const trxCount  = TX.filter(t=>{
+      if (!t.tradeDate) return false;
+      const d=new Date(t.tradeDate.replace(/-/g,'/'));
+      return d.getFullYear()===m.year && d.getMonth()===m.month;
+    }).length;
+    return { label: m.label, propCount, trxCount };
+  });
+  const maxBar = Math.max(1, ...monthData.map(m=>Math.max(m.propCount, m.trxCount)));
+
+  // 担当者別成約件数
+  const agentMap = {};
+  TX.forEach(t => { if (t.agent) agentMap[t.agent] = (agentMap[t.agent]||0)+1; });
+  const topAgentsTx = Object.entries(agentMap).sort(([,a],[,b])=>b-a).slice(0,5);
+
+  // 総報酬額
+  const totalComm = TX.reduce((s,t)=>s+(parseFloat(t.commission)||0),0);
+
+  // アクティブ物件
+  const activeProps = P.filter(p=>['販売活動中','募集中','申込中'].includes(p.status))
+    .sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,6);
+
+  // 期限タスク（未完了・今後7日以内 or 期限超過）
+  const nowMs = Date.now();
+  const sevenDays = nowMs + 7*24*60*60*1000;
+  const urgentTasks = TK.filter(t => {
+    if (t.done) return false;
+    if (!t.dueDate) return false;
+    const due = new Date(t.dueDate).getTime();
+    return due <= sevenDays;
+  }).sort((a,b)=>new Date(a.dueDate).getTime()-new Date(b.dueDate).getTime()).slice(0,8);
 
   document.getElementById('cnt').innerHTML = `
     <div class="stats-row">
@@ -4356,10 +4714,41 @@ function renderDash() {
         <div class="stat-value" style="color:var(--success)">${cnt('成約')}</div>
         <div class="stat-sub">件</div>
       </div>
+      <div class="stat-card" style="cursor:pointer" onclick="nav('ledger')">
+        <div class="stat-label">報酬実績</div>
+        <div class="stat-value" style="color:var(--success);font-size:18px">${totalComm.toLocaleString()}万</div>
+        <div class="stat-sub">${TX.length}件取引 →台帳へ</div>
+      </div>
       <div class="stat-card" style="cursor:pointer" onclick="nav('market')">
         <div class="stat-label">市場データ</div>
         <div class="stat-value" style="color:#553c9a">${MD.length}</div>
-        <div class="ms-sub" style="font-size:10px;color:var(--text-muted)">件取込済 →分析へ</div>
+        <div class="stat-sub">件取込済 →分析へ</div>
+      </div>
+    </div>
+
+    <!-- 月別成約・取引グラフ -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span style="flex:1">月別 成約・取引件数</span>
+        <button class="btn btn-secondary btn-sm" onclick="dashMonthOffset+=6;renderDash()" ${!canGoPrev?'disabled':''} style="padding:3px 10px;font-size:11px">◀ 前の6ヶ月</button>
+        <span style="font-size:11px;color:var(--text-muted);min-width:100px;text-align:center">${months[0].label} 〜 ${months[5].label}</span>
+        <button class="btn btn-secondary btn-sm" onclick="dashMonthOffset=Math.max(0,dashMonthOffset-6);renderDash()" ${!canGoNext?'disabled':''} style="padding:3px 10px;font-size:11px">次の6ヶ月 ▶</button>
+      </div>
+      <div style="padding:14px 16px">
+        <div style="display:flex;gap:12px;margin-bottom:8px;font-size:11px">
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:var(--primary);border-radius:2px;display:inline-block"></span>成約物件</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:var(--success);border-radius:2px;display:inline-block"></span>取引台帳</span>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px;height:80px;padding-bottom:24px;position:relative">
+          ${monthData.map(m => `
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end">
+              <div style="width:100%;display:flex;gap:2px;align-items:flex-end;justify-content:center;flex:1">
+                <div style="width:40%;background:var(--primary);border-radius:3px 3px 0 0;height:${m.propCount?Math.max(4,m.propCount/maxBar*100)+'%':'2px'};opacity:0.85" title="成約${m.propCount}件"></div>
+                <div style="width:40%;background:var(--success);border-radius:3px 3px 0 0;height:${m.trxCount?Math.max(4,m.trxCount/maxBar*100)+'%':'2px'};opacity:0.85" title="取引${m.trxCount}件"></div>
+              </div>
+              <div style="font-size:10px;color:var(--text-muted);white-space:nowrap">${m.label}</div>
+            </div>`).join('')}
+        </div>
       </div>
     </div>
 
@@ -4370,51 +4759,95 @@ function renderDash() {
           ${ALL_STATUSES.map(s => {
             const n = cnt(s);
             if (!n) return '';
-            return `<div class="prog-row">
-              <span class="badge badge-${s}" style="min-width:70px;text-align:center">${s}</span>
-              <div class="prog-bar"><div class="prog-fill" style="width:${P.length?n/P.length*100:0}%"></div></div>
-              <span style="font-size:13px;font-weight:700;min-width:24px;text-align:right">${n}</span>
-            </div>`;
+            return '<div class="prog-row">'
+              + '<span class="badge badge-'+s+'" style="min-width:70px;text-align:center">'+s+'</span>'
+              + '<div class="prog-bar"><div class="prog-fill" style="width:'+(P.length?n/P.length*100:0)+'%"></div></div>'
+              + '<span style="font-size:13px;font-weight:700;min-width:24px;text-align:right">'+n+'</span>'
+              + '</div>';
           }).join('')}
         </div>
       </div>
       <div class="card">
         <div class="card-header">最近の登録物件</div>
-        ${recent.length ? recent.map(p=>`
-          <div style="padding:9px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center"
-               onclick="nav('props');setTimeout(()=>showPropDetail('${p.id}'),50)">
-            <div>
-              <div style="font-size:12px;font-weight:600">${esc(p.name||'未設定')}</div>
-              <div style="font-size:10px;color:var(--text-muted)">${p.ts?new Date(p.ts).toLocaleDateString('ja-JP'):'-'} 登録</div>
-            </div>
-            <span class="badge badge-${p.status||'未提案'}">${p.status||'未提案'}</span>
-          </div>`).join('')
+        ${recent.length ? recent.map(p=>
+          '<div style="padding:9px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center"'
+          +' onclick="nav(\'props\');setTimeout(()=>showPropDetail(\''+p.id+'\'),50)">'
+          + '<div>'
+          + '<div style="font-size:12px;font-weight:600">'+esc(p.name||'未設定')+'</div>'
+          + '<div style="font-size:10px;color:var(--text-muted)">'+(p.ts?new Date(p.ts).toLocaleDateString('ja-JP'):'-')+' 登録</div>'
+          + '</div>'
+          + '<span class="badge badge-'+(p.status||'未提案')+'">'+(p.status||'未提案')+'</span>'
+          + '</div>'
+        ).join('')
         : '<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center">物件がありません</div>'}
       </div>
     </div>
+
+    <!-- 今月のアクティブ物件 -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+        今月のアクティブ物件
+        <span style="font-size:11px;color:var(--text-muted)">${activeProps.length}件</span>
+      </div>
+      ${activeProps.length ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0">'
+        + activeProps.map(p=>
+          '<div style="padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer"'
+          +' onclick="nav(\'props\');setTimeout(()=>showPropDetail(\''+p.id+'\'),50)">'
+          + '<div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name||'未設定')+'</div>'
+          + '<div style="display:flex;align-items:center;gap:6px;margin-top:3px">'
+          + '<span class="badge badge-'+(p.status||'未提案')+'" style="font-size:10px">'+(p.status||'未提案')+'</span>'
+          + '<span style="font-size:10px;color:var(--text-muted)">'+esc(p.location||'-')+'</span>'
+          + '</div>'
+          + '</div>'
+        ).join('')
+        + '</div>'
+      : '<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center">アクティブな物件がありません</div>'}
+    </div>
+
+    <!-- タスク（期限切れ・7日以内） -->
+    ${urgentTasks.length ? `
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;align-items:center;gap:8px">
+        ⚠ 期限が近いタスク（7日以内）
+        <span style="font-size:11px;background:var(--danger);color:#fff;padding:1px 7px;border-radius:10px">${urgentTasks.length}</span>
+      </div>
+      ${urgentTasks.map(t => {
+        const due = new Date(t.dueDate).getTime();
+        const overdue = due < nowMs;
+        const prop = P.find(p=>p.id===t.propId);
+        const pc = {高:'#e53e3e',中:'#dd6b20',低:'#718096'};
+        return '<div style="padding:9px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;cursor:pointer"'
+          + ' onclick="nav(\'props\');setTimeout(()=>showPropDetail(\''+t.propId+'\'),50)">'
+          + '<span style="width:8px;height:8px;border-radius:50%;background:'+(pc[t.priority]||'#718096')+';flex-shrink:0"></span>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.content)+'</div>'
+          + '<div style="font-size:10px;color:var(--text-muted)">'+esc(prop?.name||'-')+'</div>'
+          + '</div>'
+          + '<span style="font-size:11px;font-weight:700;color:'+(overdue?'#e53e3e':'var(--text-muted)')+'">'+esc(t.dueDate)+'</span>'
+          + '</div>';
+      }).join('')}
+    </div>` : ''}
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="card">
         <div class="card-header">顧客別 提案件数 TOP 5</div>
         ${topCusts.length ? topCusts.map(([id,n])=>{
           const c = D.customers.find(x=>x.id===id); if (!c) return '';
-          return `<div style="padding:9px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer"
-                       onclick="filterByCust('${id}')">
-            <span style="font-size:12px">👤 ${esc(c.name)}</span>
-            <span style="background:var(--primary);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px">${n}件</span>
-          </div>`;
+          return '<div style="padding:9px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer"'
+            + ' onclick="filterByCust(\''+id+'\')">'
+            + '<span style="font-size:12px">👤 '+esc(c.name)+'</span>'
+            + '<span style="background:var(--primary);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px">'+n+'件</span>'
+            + '</div>';
         }).join('') : '<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center">データなし</div>'}
       </div>
       <div class="card">
-        <div class="card-header">業者別 物件数 TOP 5</div>
-        ${topAgents.length ? topAgents.map(([id,n])=>{
-          const a = D.agents.find(x=>x.id===id); if (!a) return '';
-          return `<div style="padding:9px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer"
-                       onclick="filterByAgent('${id}')">
-            <span style="font-size:12px">🏪 ${esc(a.name)}</span>
-            <span style="background:#6b46c1;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px">${n}件</span>
-          </div>`;
-        }).join('') : '<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center">データなし</div>'}
+        <div class="card-header">担当者別 成約件数（取引台帳）</div>
+        ${topAgentsTx.length ? topAgentsTx.map(([name,n])=>
+          '<div style="padding:9px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">'
+          + '<span style="font-size:12px">🧑‍💼 '+esc(name)+'</span>'
+          + '<span style="background:#276749;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px">'+n+'件</span>'
+          + '</div>'
+        ).join('') : '<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center">取引台帳にデータなし</div>'}
       </div>
     </div>`;
 }
@@ -4446,6 +4879,1135 @@ function onImport(e) {
   };
   r.readAsText(f); e.target.value = '';
 }
+
+/* ══════════════════════════════════════════════
+   取引台帳 (Transaction Ledger)
+══════════════════════════════════════════════ */
+function renderLedger() {
+  if (!D.transactions) D.transactions = [];
+  const list = [...D.transactions].sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const totalPrice = list.reduce((s,t)=>s+(parseFloat(t.price)||0),0);
+  const totalComm  = list.reduce((s,t)=>s+(parseFloat(t.commission)||0),0);
+
+  const tradeColors = { '売買':'#2b6cb0', '貸借':'#276749', '交換':'#744210' };
+  const agencyColors = { '専任':'#553c9a', '専属専任':'#322659', '一般':'#718096', '代理':'#234e52' };
+
+  document.getElementById('cnt').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="showLedgerModal()">＋ 新規入力</button>
+      <button class="btn btn-secondary" onclick="exportLedgerCsv()">📥 CSV出力</button>
+      <div class="stat-card" style="padding:8px 14px;flex:1;min-width:140px">
+        <div class="stat-label">件数</div>
+        <div style="font-size:20px;font-weight:800;color:var(--primary)">${list.length}件</div>
+      </div>
+      <div class="stat-card" style="padding:8px 14px;flex:1;min-width:160px">
+        <div class="stat-label">総取引価格</div>
+        <div style="font-size:18px;font-weight:800;color:var(--primary)">${totalPrice.toLocaleString()}万円</div>
+      </div>
+      <div class="stat-card" style="padding:8px 14px;flex:1;min-width:160px">
+        <div class="stat-label">総報酬額</div>
+        <div style="font-size:18px;font-weight:800;color:var(--success)">${totalComm.toLocaleString()}万円</div>
+      </div>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>No.</th><th>取引日</th><th>所在地</th><th>種別</th><th>態様</th><th>媒介種別</th>
+        <th>売主/貸主</th><th>買主/借主</th><th>取引価格(万)</th><th>報酬額(万)</th>
+        <th>契約日</th><th>引渡日</th><th>担当者</th>
+      </tr></thead>
+      <tbody>
+        ${list.length ? list.map(t => {
+          const tc = tradeColors[t.tradeType] || '#718096';
+          const ac = agencyColors[t.agencyType] || '#718096';
+          return '<tr onclick="showLedgerModal(\''+t.id+'\')">'
+            + '<td style="font-size:11px;color:var(--text-muted)">'+esc(t.no||'-')+'</td>'
+            + '<td>'+esc(t.tradeDate||'-')+'</td>'
+            + '<td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.location||'-')+'</td>'
+            + '<td>'+esc(t.propType||'-')+'</td>'
+            + '<td style="white-space:nowrap"><span style="background:'+tc+';color:#fff;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;white-space:nowrap">'+esc(t.tradeType||'-')+'</span></td>'
+            + '<td style="white-space:nowrap"><span style="background:'+ac+';color:#fff;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;white-space:nowrap">'+esc(t.agencyType||'-')+'</span></td>'
+            + '<td>'+esc(t.sellerName||'-')+'</td>'
+            + '<td>'+esc(t.buyerName||'-')+'</td>'
+            + '<td style="text-align:right;font-weight:700">'+(t.price?(parseFloat(t.price)||0).toLocaleString():'-')+'</td>'
+            + '<td style="text-align:right;color:var(--success);font-weight:700">'+(t.commission?(parseFloat(t.commission)||0).toLocaleString():'-')+'</td>'
+            + '<td>'+esc(t.contractDate||'-')+'</td>'
+            + '<td>'+esc(t.deliveryDate||'-')+'</td>'
+            + '<td>'+esc(t.agent||'-')+'</td>'
+            + '</tr>';
+        }).join('') : '<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-muted)">取引台帳にデータがありません</td></tr>'}
+      </tbody>
+    </table></div>`;
+}
+
+function showLedgerModal(editId='') {
+  const t = editId ? (D.transactions||[]).find(x=>x.id===editId) : null;
+  const propOpts = (D.properties||[]).map(p=>'<option value="'+p.id+'"'+(t?.propId===p.id?' selected':'')+'>'+esc(p.name||p.location||p.id)+'</option>').join('');
+  showModal(`
+    <div class="modal modal-xl">
+      <div class="modal-hd">
+        <div>
+          <div class="modal-title">${t?'取引記録を編集':'新規取引記録'}</div>
+          <div class="modal-subtitle">${t?'No. '+esc(t.no||''):'宅建業法の業務帳簿（取引台帳）'}</div>
+        </div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-sec">
+          <div class="form-sec-title">基本情報</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>取引日 <span class="req">*</span></label>
+              <input type="text" id="ld-tradeDate" value="${ea(t?.tradeDate||'')}" placeholder="例：2024-01-15">
+            </div>
+            <div class="form-group">
+              <label>所在地 <span class="req">*</span></label>
+              <input type="text" id="ld-location" value="${ea(t?.location||'')}" placeholder="例：神奈川県横浜市港南区〇〇">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>物件種別</label>
+              <select id="ld-propType">
+                ${['','一戸建て','マンション','土地','アパート','収益物件','その他'].map(v=>'<option value="'+v+'"'+(t?.propType===v?' selected':'')+'>'+v+'</option>').join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>物件紐付け（任意）</label>
+              <select id="ld-propId">
+                <option value="">（紐付けなし）</option>
+                ${propOpts}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="form-sec">
+          <div class="form-sec-title">取引態様・媒介</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>取引態様</label>
+              <select id="ld-tradeType">
+                ${['','売買','貸借','交換'].map(v=>'<option value="'+v+'"'+(t?.tradeType===v?' selected':'')+'>'+v+'</option>').join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>媒介種別</label>
+              <select id="ld-agencyType">
+                ${['','専任','専属専任','一般','代理'].map(v=>'<option value="'+v+'"'+(t?.agencyType===v?' selected':'')+'>'+v+'</option>').join('')}
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>売主/貸主</label>
+              <input type="text" id="ld-sellerName" value="${ea(t?.sellerName||'')}" placeholder="売主・貸主の名前">
+            </div>
+            <div class="form-group">
+              <label>買主/借主</label>
+              <input type="text" id="ld-buyerName" value="${ea(t?.buyerName||'')}" placeholder="買主・借主の名前">
+            </div>
+          </div>
+        </div>
+        <div class="form-sec">
+          <div class="form-sec-title">金額・日程</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>取引価格（万円）</label>
+              <input type="number" id="ld-price" value="${t?.price||''}" placeholder="例：3500">
+            </div>
+            <div class="form-group">
+              <label>報酬額（万円）</label>
+              <input type="number" id="ld-commission" value="${t?.commission||''}" placeholder="例：105">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>契約日</label>
+              <input type="text" id="ld-contractDate" value="${ea(t?.contractDate||'')}" placeholder="例：2024-01-20">
+            </div>
+            <div class="form-group">
+              <label>引渡日</label>
+              <input type="text" id="ld-deliveryDate" value="${ea(t?.deliveryDate||'')}" placeholder="例：2024-02-28">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>担当者</label>
+              <input type="text" id="ld-agent" value="${ea(t?.agent||'')}" placeholder="担当者名">
+            </div>
+            <div class="form-group">
+              <label>備考</label>
+              <input type="text" id="ld-notes" value="${ea(t?.notes||'')}" placeholder="特記事項など">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-ft">
+        ${t?'<button class="btn btn-danger" onclick="delLedger(\''+t.id+'\')">削除</button>':''}
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="saveLedger('${editId}')">${t?'更新する':'登録する'}</button>
+      </div>
+    </div>`);
+}
+
+function saveLedger(editId) {
+  const tradeDate = document.getElementById('ld-tradeDate').value.trim();
+  const location  = document.getElementById('ld-location').value.trim();
+  if (!tradeDate || !location) { toast('取引日と所在地は必須です','err'); return; }
+  if (!D.transactions) D.transactions = [];
+  const existing = editId ? D.transactions.find(x=>x.id===editId) : null;
+  const entry = {
+    id:           editId || uid(),
+    ts:           existing?.ts || Date.now(),
+    no:           existing?.no || 'TRX-'+String(D.transactions.length+1).padStart(4,'0'),
+    tradeDate,
+    location,
+    propType:     document.getElementById('ld-propType').value,
+    propId:       document.getElementById('ld-propId').value,
+    tradeType:    document.getElementById('ld-tradeType').value,
+    agencyType:   document.getElementById('ld-agencyType').value,
+    sellerName:   document.getElementById('ld-sellerName').value.trim(),
+    buyerName:    document.getElementById('ld-buyerName').value.trim(),
+    price:        parseFloat(document.getElementById('ld-price').value)||0,
+    commission:   parseFloat(document.getElementById('ld-commission').value)||0,
+    contractDate: document.getElementById('ld-contractDate').value.trim(),
+    deliveryDate: document.getElementById('ld-deliveryDate').value.trim(),
+    agent:        document.getElementById('ld-agent').value.trim(),
+    notes:        document.getElementById('ld-notes').value.trim(),
+  };
+  if (existing) { Object.assign(existing, entry); }
+  else { D.transactions.push(entry); }
+  save(); closeModal(); toast('取引記録を'+(editId?'更新':'登録')+'しました','ok'); renderLedger();
+}
+
+function delLedger(id) {
+  if (!confirm('この取引記録を削除しますか？')) return;
+  D.transactions = (D.transactions||[]).filter(x=>x.id!==id);
+  save(); toast('削除しました','ok'); closeModal(); renderLedger();
+}
+
+function exportLedgerCsv() {
+  if (!D.transactions||!D.transactions.length) { toast('データがありません','err'); return; }
+  const headers = ['No.','取引日','所在地','種別','取引態様','媒介種別','売主/貸主','買主/借主','取引価格(万)','報酬額(万)','契約日','引渡日','担当者','備考'];
+  const rows = D.transactions.map(t => [
+    t.no||'', t.tradeDate||'', t.location||'', t.propType||'',
+    t.tradeType||'', t.agencyType||'', t.sellerName||'', t.buyerName||'',
+    t.price||0, t.commission||0, t.contractDate||'', t.deliveryDate||'',
+    t.agent||'', t.notes||''
+  ]);
+  const csv = [headers, ...rows].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = '取引台帳_'+new Date().toLocaleDateString('ja-JP').replace(/\//g,'-')+'.csv';
+  a.click(); URL.revokeObjectURL(url);
+  toast('CSVを出力しました','ok');
+}
+
+/* ══════════════════════════════════════════════
+   AIプロンプト生成
+══════════════════════════════════════════════ */
+function showPromptModal(title, promptText) {
+  showModal(`
+    <div class="modal" style="max-width:760px">
+      <div class="modal-hd">
+        <div class="modal-title">${esc(title)}</div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#2b6cb0">
+          このプロンプトをClaude・ChatGPT・Geminiなどに貼り付けてお使いください。
+        </div>
+        <textarea id="prompt-text" style="width:100%;min-height:320px;font-size:12px;font-family:monospace;line-height:1.6;background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:10px" readonly>${esc(promptText)}</textarea>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-secondary" onclick="closeModal()">閉じる</button>
+        <button class="btn btn-primary" onclick="copyPrompt()">📋 コピー</button>
+      </div>
+    </div>`);
+}
+
+function copyPrompt() {
+  const ta = document.getElementById('prompt-text');
+  if (!ta) return;
+  navigator.clipboard.writeText(ta.value).then(()=>toast('プロンプトをコピーしました','ok')).catch(()=>{
+    ta.select(); document.execCommand('copy'); toast('コピーしました','ok');
+  });
+}
+
+function genAppraisalPrompt(propId) {
+  const p = D.properties.find(x=>x.id===propId); if (!p) return;
+  const area = (p.location||'').split('市')[0]+'市';
+  const mktMatch = (D.marketData||[]).filter(m=>
+    m.status==='成約' && m.type===p.type && (m.location||'').includes(area.replace('市',''))
+  ).slice(0,5);
+  const mktText = mktMatch.length ? mktMatch.map((m,i)=>
+    `  事例${i+1}: ${m.location||''} / ${m.type||''} / ${m.buildArea||'-'}㎡ / 築${m.age||'-'}年 / 成約価格${m.price||'-'}万円`
+  ).join('\n') : '  （市場データなし）';
+
+  const prompt = `# 不動産査定プロンプト（property-appraisal）
+
+## 対象物件の基本情報
+- 物件名: ${p.name||'未設定'}
+- 所在地: ${p.location||'-'}
+- 種別: ${p.type||'-'} / カテゴリ: ${p.category||'-'}
+- 価格（希望）: ${p.price?p.price+'万円':'-'}
+- 建物面積: ${p.buildArea||p.area||'-'}㎡ / 土地面積: ${p.landArea||'-'}㎡
+- 間取り: ${p.layout||'-'} / 築年数: ${p.age!=null&&p.age!==''?'築'+p.age+'年':'-'}
+- 構造: ${p.structure||'-'}
+- 都市計画: ${p.cityPlan||'-'} / 用途地域: ${p.useZone||'-'}
+- 接道状況: ${p.road||'-'}
+- その他: ${p.extra||'-'}
+- 備考: ${p.notes||'-'}
+
+## 近隣成約事例（同種別・同エリア）
+${mktText}
+
+## 査定依頼内容
+上記の物件情報と近隣成約事例を踏まえて、以下を行ってください。
+
+1. 適正査定価格の算出（根拠を示してください）
+2. 坪単価・㎡単価の比較分析
+3. 価格設定の根拠となる強み・弱みの整理
+4. 査定価格レンジの提示（強気価格 / 標準価格 / 早期成約価格）
+5. 売却に向けた具体的なアドバイス
+
+査定書として使用できる形式で出力してください。`;
+
+  showPromptModal('📋 査定プロンプト', prompt);
+}
+
+function genCompetitorPrompt(propId) {
+  const p = D.properties.find(x=>x.id===propId); if (!p) return;
+  const area = (p.location||'').split('市')[0]+'市';
+  const mktMatch = (D.marketData||[]).filter(m=>
+    m.status==='販売中' && m.type===p.type && (m.location||'').includes(area.replace('市',''))
+  ).slice(0,8);
+  const mktText = mktMatch.length ? mktMatch.map((m,i)=>
+    `  競合${i+1}: ${m.location||''} / ${m.buildArea||'-'}㎡ / 築${m.age||'-'}年 / 販売価格${m.price||'-'}万円 / 駅${m.walkMin||'-'}分`
+  ).join('\n') : '  （競合データなし）';
+
+  const prompt = `# 競合分析プロンプト（competitor-analysis）
+
+## 対象物件（売出予定）
+- 物件名: ${p.name||'未設定'}
+- 所在地: ${p.location||'-'}
+- 種別: ${p.type||'-'} / 価格（予定）: ${p.price?p.price+'万円':'-'}
+- 建物面積: ${p.buildArea||p.area||'-'}㎡ / 土地面積: ${p.landArea||'-'}㎡
+- 間取り: ${p.layout||'-'} / 築年数: ${p.age!=null&&p.age!==''?'築'+p.age+'年':'-'}
+- ステータス: ${p.status||'-'}
+
+## 現在の競合物件（販売中・同種別・同エリア）
+${mktText}
+
+## 競合分析の依頼
+上記データをもとに、以下の競合分析を行ってください。
+
+1. 対象物件の市場ポジショニング（価格帯・スペックの位置づけ）
+2. 競合との差別化ポイント（強み・弱みの比較）
+3. 価格戦略の提案（競合に勝つための価格設定）
+4. 売出し開始時の注意点・改善提案
+5. 想定される問い合わせ客層と訴求ポイント
+
+売主への説明資料として使える形式でまとめてください。`;
+
+  showPromptModal('🔍 競合分析プロンプト', prompt);
+}
+
+function genSnsPrompt(propId) {
+  const p = D.properties.find(x=>x.id===propId); if (!p) return;
+  const prompt = `# SNS投稿生成プロンプト（social-post / instagram-reels）
+
+## 物件情報
+- 物件名: ${p.name||'未設定'}
+- 所在地: ${p.location||'-'}
+- 種別: ${p.type||'-'} / 価格: ${p.price?p.price+'万円':'-'}
+- 建物面積: ${p.buildArea||p.area||'-'}㎡ / 土地面積: ${p.landArea||'-'}㎡
+- 間取り: ${p.layout||'-'} / 築年数: ${p.age!=null&&p.age!==''?'築'+p.age+'年':'-'}
+- その他特徴: ${p.extra||'-'}
+- 担当メモ: ${p.notes||'-'}
+
+## 作成してほしいSNSコンテンツ
+
+### 1. Instagramフィード投稿
+- キャプション（絵文字・ハッシュタグ付き）
+- 物件の魅力が伝わる文章（200〜300文字）
+- 不動産仲介アカウント向け
+
+### 2. Instagramリール台本（フェイスレス・テロップ主体）
+- 冒頭2秒のフック（視聴者の目を引く一言）
+- 15〜30秒の構成（秒割り）
+- 画面テロップ原稿
+- ナレーション/BGMメモ
+- CTA（保存・フォロー誘導）
+
+### 3. X（Twitter）投稿
+- 140字以内のツイート文
+- ハッシュタグ付き
+
+不当表示を避け、確認済みの事実のみを使ってください。
+「〇〇から徒歩〇分」等の具体数値がない場合は記載しないでください。`;
+
+  showPromptModal('📣 SNS投稿生成プロンプト', prompt);
+}
+
+/* ══════════════════════════════════════════════
+   書類チェックリスト
+══════════════════════════════════════════════ */
+const DOC_CHECK_ITEMS = [
+  { id:'dc01', label:'登記事項証明書（甲区・乙区）の確認' },
+  { id:'dc02', label:'公図・地積測量図の取得' },
+  { id:'dc03', label:'建物図面・各階平面図の確認' },
+  { id:'dc04', label:'都市計画情報（用途地域・建ぺい率・容積率）' },
+  { id:'dc05', label:'道路種別・幅員・接道状況の確認' },
+  { id:'dc06', label:'上下水道・ガス引込状況の確認' },
+  { id:'dc07', label:'法令上の制限（開発行為・造成規制等）' },
+  { id:'dc08', label:'越境・境界確定の状況' },
+  { id:'dc09', label:'建物状況調査（インスペクション）報告書' },
+  { id:'dc10', label:'設備の状況・付帯設備表の確認' },
+  { id:'dc11', label:'管理規約・議事録（マンションの場合）' },
+  { id:'dc12', label:'アスベスト使用調査報告書' },
+  { id:'dc13', label:'耐震診断報告書（昭和56年以前の建物）' },
+  { id:'dc14', label:'土壌汚染状況調査（工場跡地等）' },
+  { id:'dc15', label:'住宅性能評価書（ある場合）' },
+  { id:'dc16', label:'フラット35適合証明書（ある場合）' },
+];
+const CONTRACT_CHECK_ITEMS = [
+  { id:'cc01', label:'当事者（売主・買主）の表示・実印確認' },
+  { id:'cc02', label:'物件表示（登記・公簿と一致しているか）' },
+  { id:'cc03', label:'手付金の額・性質（解約手付）' },
+  { id:'cc04', label:'売買代金・支払時期・支払方法' },
+  { id:'cc05', label:'引渡条件（現状渡し or 更地渡し等）' },
+  { id:'cc06', label:'引渡日・所有権移転登記日の明記' },
+  { id:'cc07', label:'瑕疵担保責任（契約不適合責任）の条項' },
+  { id:'cc08', label:'ローン特約・解除条件の記載' },
+  { id:'cc09', label:'境界・越境に関する特約' },
+  { id:'cc10', label:'設備の引継ぎ・故障の取扱い特約' },
+  { id:'cc11', label:'土地・建物固定資産税の精算方法' },
+  { id:'cc12', label:'その他の特約事項の整合性確認' },
+];
+
+function showDocChecklist(propId) {
+  if (!D.checklists) D.checklists = {};
+  const cl = D.checklists[propId] || {};
+  const docDone  = DOC_CHECK_ITEMS.filter(x=>cl[x.id]).length;
+  const contDone = CONTRACT_CHECK_ITEMS.filter(x=>cl[x.id]).length;
+
+  const renderSection = (title, items, prefix) => {
+    const done = items.filter(x=>cl[x.id]).length;
+    return '<div style="margin-bottom:16px">'
+      + '<div style="font-weight:700;color:var(--primary);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">'
+      + '<span>' + esc(title) + '</span>'
+      + '<span style="font-size:11px;background:'+(done===items.length?'var(--success)':'var(--primary)')+';color:#fff;padding:2px 8px;border-radius:10px">'
+      + done + '/' + items.length + '</span>'
+      + '</div>'
+      + items.map(item => '<label style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px">'
+        + '<input type="checkbox"' + (cl[item.id]?' checked':'') + ' onchange="toggleChecklist(\''+propId+'\',\''+item.id+'\')" style="margin-top:2px;cursor:pointer">'
+        + '<span style="' + (cl[item.id]?'text-decoration:line-through;color:var(--text-muted)':'') + '">' + esc(item.label) + '</span>'
+        + '</label>'
+      ).join('')
+      + '</div>';
+  };
+
+  const totalDone = docDone + contDone;
+  const totalAll  = DOC_CHECK_ITEMS.length + CONTRACT_CHECK_ITEMS.length;
+  const pct = Math.round(totalDone/totalAll*100);
+
+  const p = D.properties.find(x=>x.id===propId);
+  showModal(`
+    <div class="modal modal-xl">
+      <div class="modal-hd">
+        <div>
+          <div class="modal-title">📋 書類チェックリスト</div>
+          <div class="modal-subtitle">${esc(p?.name||propId)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="text-align:center">
+            <div style="font-size:22px;font-weight:800;color:'+(pct===100?'var(--success)':'var(--primary)'">${pct}%</div>
+            <div style="font-size:10px;color:var(--text-muted)">${totalDone}/${totalAll} 完了</div>
+          </div>
+          <span class="modal-close" onclick="closeModal()">✕</span>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div style="background:var(--bg);border-radius:6px;height:8px;margin-bottom:16px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${pct===100?'var(--success)':'var(--primary)'};border-radius:6px;transition:width .3s"></div>
+        </div>
+        ${renderSection('重要事項説明書 チェックリスト', DOC_CHECK_ITEMS, 'dc')}
+        ${renderSection('売買契約書 チェックリスト', CONTRACT_CHECK_ITEMS, 'cc')}
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-secondary" onclick="resetChecklist('${propId}')">リセット</button>
+        <button class="btn btn-primary" onclick="closeModal()">完了</button>
+      </div>
+    </div>`);
+}
+
+function toggleChecklist(propId, itemId) {
+  if (!D.checklists) D.checklists = {};
+  if (!D.checklists[propId]) D.checklists[propId] = {};
+  D.checklists[propId][itemId] = !D.checklists[propId][itemId];
+  save();
+  // Update progress display without re-rendering full modal
+  const totalDone = [...DOC_CHECK_ITEMS, ...CONTRACT_CHECK_ITEMS].filter(x=>D.checklists[propId][x.id]).length;
+  const totalAll  = DOC_CHECK_ITEMS.length + CONTRACT_CHECK_ITEMS.length;
+  const pct = Math.round(totalDone/totalAll*100);
+  const bar = document.querySelector('.modal-body > div[style*="height:8px"] > div');
+  if (bar) { bar.style.width = pct+'%'; bar.style.background = pct===100?'var(--success)':'var(--primary)'; }
+}
+
+function resetChecklist(propId) {
+  if (!confirm('チェックリストをリセットしますか？')) return;
+  if (D.checklists) delete D.checklists[propId];
+  save(); closeModal(); toast('リセットしました','ok');
+}
+
+/* ══════════════════════════════════════════════
+   タスク管理
+══════════════════════════════════════════════ */
+function showTaskModal(propId, editId='') {
+  const t = editId ? (D.tasks||[]).find(x=>x.id===editId) : null;
+  showModal(`
+    <div class="modal" style="max-width:480px">
+      <div class="modal-hd">
+        <div class="modal-title">${t?'タスクを編集':'タスクを追加'}</div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>タスク内容 <span class="req">*</span></label>
+          <textarea id="tk-content" rows="3" placeholder="例：重要事項説明書を作成する">${esc(t?.content||'')}</textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>期限日</label>
+            <input type="date" id="tk-due" value="${ea(t?.dueDate||'')}">
+          </div>
+          <div class="form-group">
+            <label>優先度</label>
+            <select id="tk-priority">
+              ${['高','中','低'].map(v=>'<option value="'+v+'"'+(t?.priority===v?' selected':'')+'>'+v+'</option>').join('')}
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-ft">
+        ${t?'<button class="btn btn-danger" onclick="delTask(\''+t.id+'\',\''+propId+'\',true)">削除</button>':''}
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="saveTask('${propId}','${editId}')">保存</button>
+      </div>
+    </div>`);
+}
+
+function saveTask(propId, editId) {
+  const content = document.getElementById('tk-content').value.trim();
+  if (!content) { toast('タスク内容を入力してください','err'); return; }
+  if (!D.tasks) D.tasks = [];
+  const existing = editId ? D.tasks.find(x=>x.id===editId) : null;
+  const task = {
+    id:       editId || uid(),
+    propId,
+    ts:       existing?.ts || Date.now(),
+    dueDate:  document.getElementById('tk-due').value,
+    content,
+    done:     existing?.done || false,
+    priority: document.getElementById('tk-priority').value,
+  };
+  if (existing) { Object.assign(existing, task); }
+  else { D.tasks.push(task); }
+  save(); closeModal(); toast('タスクを保存しました','ok');
+  showPropDetail(propId);
+}
+
+function toggleTask(taskId) {
+  if (!D.tasks) return;
+  const t = D.tasks.find(x=>x.id===taskId); if (!t) return;
+  t.done = !t.done;
+  save(); toast(t.done?'完了しました':'未完了に戻しました','ok');
+}
+
+function delTask(taskId, propId, fromModal) {
+  if (!confirm('このタスクを削除しますか？')) return;
+  D.tasks = (D.tasks||[]).filter(x=>x.id!==taskId);
+  save(); toast('タスクを削除しました','ok');
+  if (fromModal) { closeModal(); }
+  if (propId) showPropDetail(propId);
+}
+
+/* ── Obi Tool ── */
+function obi$(id){ return document.getElementById('o-'+id); }
+function obiTick(){ return new Promise(r=>setTimeout(r,0)); }
+function obiSetPill(n,s){ obi$('pill'+n).className='obi-pill '+s; }
+function obiShow(id){ obi$(id).style.display=''; }
+function obiHide(id){ obi$(id).style.display='none'; }
+
+// Obi global state
+let obiBandFile=null, obiBandUrl='', obiBandType='';
+let obiBandImgNatW=0, obiBandImgNatH=0;
+let obiBandImgEl=null;
+let obiPdfFiles=[], obiPreviewIdx=0;
+let obiCurDoc=null, obiCurPageNum=1, obiTotalPgs=1;
+let obiPgSettings=new Map();
+let obiCutFrac=0.15;
+let obiBandPos='bottom';
+let obiBandWidthPct=100;
+let obiBandHAlign=0;
+let obiBandVertPct=0;
+let obiProcessed=[];
+let obiDragging=false;
+
+function obiGetPageCutFrac(pageNum){
+  const s=obiPgSettings.get(pageNum!=null?pageNum:obiCurPageNum);
+  return s?s.cutFrac:0.15;
+}
+
+function obiLoadBand(f){
+  obiBandFile=f;
+  obiBandType=f.type||(f.name.toLowerCase().endsWith('.png')?'image/png':'image/jpeg');
+  if(obiBandUrl) URL.revokeObjectURL(obiBandUrl);
+  obiBandUrl=URL.createObjectURL(f);
+  obiBandImgEl=new Image();
+  obiBandImgEl.onload=()=>{
+    obiBandImgNatW=obiBandImgEl.naturalWidth;
+    obiBandImgNatH=obiBandImgEl.naturalHeight;
+    obi$('bimg').src=obiBandUrl;
+    obi$('bmeta').textContent=`${obiBandImgNatW} × ${obiBandImgNatH} px ／ ${(f.size/1024).toFixed(0)} KB`;
+    obi$('bprev').style.display='block';
+    obi$('bovlImg').src=obiBandUrl;
+    obiSetPill(1,'done'); obiSetPill(2,'active');
+    obiCheckReady();
+    obiRefreshOverlay();
+    obiRenderMini();
+  };
+  obiBandImgEl.src=obiBandUrl;
+}
+
+function obiAddFiles(files){
+  files.forEach(f=>{ if(!obiPdfFiles.some(x=>x.name===f.name&&x.size===f.size)) obiPdfFiles.push(f); });
+  obiRenderPList();
+  obiCheckReady();
+}
+
+function obiRmPdf(i){
+  obiPdfFiles.splice(i,1);
+  if(obiPreviewIdx>=obiPdfFiles.length) obiPreviewIdx=Math.max(0,obiPdfFiles.length-1);
+  obiRenderPList();
+  if(!obiPdfFiles.length){ obiHide('prevCard'); obiHide('procCard'); }
+  else obiLoadPreview();
+}
+
+function obiRenderPList(){
+  const el=obi$('plist');
+  if(!obiPdfFiles.length){
+    el.innerHTML='<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:18px 0">PDFがまだ追加されていません</div>';
+    obi$('pcount').textContent='';
+    obi$('addmore').style.display='none';
+    return;
+  }
+  el.innerHTML=obiPdfFiles.map((f,i)=>`<div class="obi-pi${i===obiPreviewIdx?' sel':''}" onclick="obiSelPdf(${i})"><span style="font-size:14px">📄</span><span class="pn" title="${esc(f.name)}">${esc(f.name)}</span><span class="ps">${(f.size/1024).toFixed(0)}KB</span><span class="px" onclick="event.stopPropagation();obiRmPdf(${i})">✕</span></div>`).join('');
+  obi$('pcount').textContent=`${obiPdfFiles.length}件`;
+  obi$('addmore').style.display='';
+}
+
+function obiSelPdf(i){ obiPreviewIdx=i; obiRenderPList(); obiLoadPreview(); }
+
+function obiCheckReady(){
+  if(obiBandFile&&obiPdfFiles.length>0){
+    obiShow('prevCard'); obiShow('procCard');
+    obiSetPill(2,'done'); obiSetPill(3,'active');
+    obiLoadPreview();
+  }
+}
+
+async function obiLoadPreview(){
+  const file=obiPdfFiles[obiPreviewIdx];
+  if(!file) return;
+  obiSetConf('loading','⏳ PDFを読み込み中...',0);
+  obiPgSettings.clear();
+  obiCurPageNum=1;
+  const ab=await file.arrayBuffer();
+  obiCurDoc=await pdfjsLib.getDocument({data:ab}).promise;
+  obiTotalPgs=obiCurDoc.numPages;
+  obi$('pfname').textContent=`プレビュー: ${file.name}（${obiTotalPgs}ページ）`+(obiPdfFiles.length>1?` — 全${obiPdfFiles.length}件に適用`:'');
+  await obiDetectAllPages();
+  await obiShowPage(1);
+  obiUpdateLcAlert();
+}
+
+async function obiDetectAllPages(){
+  for(let p=1;p<=obiTotalPgs;p++){
+    obiSetConf('loading',`⏳ ページ ${p}/${obiTotalPgs} を解析中...`,0);
+    const pg=await obiCurDoc.getPage(p);
+    const result=await obiDetectPage(pg,obiBandPos);
+    obiPgSettings.set(p,{cutFrac:result.frac,confidence:result.conf,source:'auto'});
+    obiUpdateDots();
+    await obiTick();
+  }
+}
+
+async function obiDetectPage(pdfPage,pos){
+  const SCALE=1.5;
+  const vp=pdfPage.getViewport({scale:SCALE});
+  const tmp=document.createElement('canvas');
+  tmp.width=vp.width; tmp.height=vp.height;
+  await pdfPage.render({canvasContext:tmp.getContext('2d'),viewport:vp}).promise;
+  return obiDetectBand(tmp,pos);
+}
+
+function obiDetectBand(canvas,pos){
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  const data=ctx.getImageData(0,0,W,H).data;
+  const step=Math.max(1,Math.floor(W/160));
+  const N=Math.floor(W/step);
+  const bright=new Float32Array(H);
+  const sat=new Float32Array(H);
+  const unif=new Float32Array(H);
+  const darkSpan=new Float32Array(H);
+  for(let y=0;y<H;y++){
+    let bS=0,sS=0,bArr=[],dkCount=0;
+    for(let x=0;x<W;x+=step){
+      const i=(y*W+x)*4;
+      const r=data[i],g=data[i+1],b=data[i+2];
+      const lum=r*.299+g*.587+b*.114;
+      const s=Math.max(r,g,b)-Math.min(r,g,b);
+      bS+=lum; sS+=s; bArr.push(lum);
+      if(lum<80) dkCount++;
+    }
+    bright[y]=bS/N; sat[y]=sS/N; darkSpan[y]=dkCount/N;
+    const mean=bS/N;
+    const vr=bArr.reduce((a,v)=>a+(v-mean)*(v-mean),0)/N;
+    unif[y]=Math.max(0,1-Math.sqrt(vr)/55);
+  }
+  const lo=Math.floor(H*.05),hi=Math.floor(H*.45);
+  const yLo=pos==='bottom'?H-hi:lo;
+  const yHi=pos==='bottom'?H-lo:hi;
+  const scores=new Float32Array(H);
+  const W4=5;
+  for(let y=yLo;y<=yHi;y++){
+    if(bright[y]<70) scores[y]+=(70-bright[y])*3.5;
+    if(darkSpan[y]>0.55) scores[y]+=darkSpan[y]*180;
+    if(y<yLo+W4||y>yHi-W4) continue;
+    const bAbv=(bright[y-1]+bright[y-2]+bright[y-3])/3;
+    const bBel=(bright[y+1]+bright[y+2]+bright[y+3])/3;
+    const bGrad=Math.abs(bAbv-bBel);
+    if(bGrad>12) scores[y]+=bGrad*1.8;
+    let sAbv=0,sBel=0;
+    for(let d=1;d<=W4;d++){sAbv+=sat[y-d];sBel+=sat[y+d];}
+    sAbv/=W4; sBel/=W4;
+    const sJump=pos==='bottom'?sBel-sAbv:sAbv-sBel;
+    if(sJump>18) scores[y]+=sJump*2.2;
+    let uAbv=0,uBel=0;
+    for(let d=1;d<=W4;d++){uAbv+=unif[y-d];uBel+=unif[y+d];}
+    uAbv/=W4; uBel/=W4;
+    const uJump=pos==='bottom'?uBel-uAbv:uAbv-uBel;
+    if(uJump>0.18) scores[y]+=uJump*90;
+  }
+  let best=-1,bestScore=0;
+  for(let y=yLo;y<=yHi;y++){
+    if(scores[y]>bestScore){bestScore=scores[y];best=y;}
+  }
+  if(best<0){
+    const def=pos==='bottom'?Math.floor(H*.84):Math.floor(H*.16);
+    return{frac:pos==='bottom'?(H-def)/H:def/H,conf:15};
+  }
+  const conf=Math.min(98,Math.round(bestScore/3.5));
+  const frac=pos==='bottom'?(H-best)/H:best/H;
+  return{frac,conf};
+}
+
+async function obiShowPage(num){
+  obiCurPageNum=num;
+  const pg=await obiCurDoc.getPage(num);
+  const s=obiPgSettings.get(num)||{cutFrac:0.15,confidence:50,source:'auto'};
+  obiCutFrac=s.cutFrac;
+  const pct=Math.round(obiCutFrac*100);
+  obi$('cutSlider').value=pct; obi$('cutVal').textContent=pct+'%';
+  obi$('bB').classList.toggle('on',obiBandPos==='bottom');
+  obi$('bT').classList.toggle('on',obiBandPos==='top');
+  obiShowConf(s);
+  const wrap=obi$('cwrap'),canvas=obi$('pc');
+  const maxW=wrap.clientWidth||520;
+  const vp0=pg.getViewport({scale:1});
+  const sc=maxW/vp0.width;
+  const vp=pg.getViewport({scale:sc});
+  canvas.width=vp.width; canvas.height=vp.height;
+  await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+  obiRefreshOverlay();
+  obiUpdateDots();
+  obiUpdatePNav();
+  await obiRenderMini(pg);
+}
+
+async function obiNavPage(delta){
+  const next=obiCurPageNum+delta;
+  if(next<1||next>obiTotalPgs) return;
+  await obiShowPage(next);
+}
+
+async function obiReDetect(){
+  obiSetConf('loading',`⏳ ページ ${obiCurPageNum} を再検出中...`,0);
+  const pg=await obiCurDoc.getPage(obiCurPageNum);
+  const result=await obiDetectPage(pg,obiBandPos);
+  obiCutFrac=result.frac;
+  obiPgSettings.set(obiCurPageNum,{cutFrac:result.frac,confidence:result.conf,source:'auto'});
+  const pct=Math.round(obiCutFrac*100);
+  obi$('cutSlider').value=pct; obi$('cutVal').textContent=pct+'%';
+  obiShowConf(obiPgSettings.get(obiCurPageNum));
+  obiRefreshOverlay();
+  obiUpdateDots();
+  await obiRenderMini(await obiCurDoc.getPage(obiCurPageNum));
+  obiUpdateLcAlert();
+}
+
+function obiApplyAll(){
+  const cf=obiGetPageCutFrac(obiCurPageNum);
+  for(let p=1;p<=obiTotalPgs;p++) obiPgSettings.set(p,{cutFrac:cf,source:'manual',confidence:100});
+  obiUpdateDots();
+  obiSetConf('manual',`✅ 全${obiTotalPgs}ページに適用（高さ ${Math.round(cf*100)}%）`,100);
+  obiUpdateLcAlert();
+}
+
+function obiShowConf(s){
+  const conf=s.confidence||0;
+  if(s.source==='manual'){
+    obiSetConf('manual',`✏️ 手動設定（高さ ${Math.round(s.cutFrac*100)}%）`,conf);
+    return;
+  }
+  if(conf>=80) obiSetConf('high',`🟢 高精度検出完了（信頼度 ${conf}%）`,conf);
+  else if(conf>=55) obiSetConf('mid',`🟡 中程度検出（信頼度 ${conf}%）— 要確認`,conf);
+  else obiSetConf('low',`🔴 低精度検出（信頼度 ${conf}%）— 赤線を確認`,conf);
+}
+
+function obiSetConf(cls,msg,pct){
+  const el=obi$('confBadge');
+  const styles={
+    high:'background:#f0fff4;color:#276749;border:1px solid #9ae6b4',
+    mid:'background:#fffbeb;color:#744210;border:1px solid #fcd34d',
+    low:'background:#fff5f5;color:#c53030;border:1px solid #fc8181',
+    loading:'background:#ebf8ff;color:#2b6cb0;border:1px solid #bee3f8',
+    manual:'background:#faf5ff;color:#553c9a;border:1px solid #d6bcfa'
+  };
+  const st=styles[cls]||styles.loading;
+  el.setAttribute('style','display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:7px;font-size:11px;font-weight:600;margin-bottom:12px;'+st);
+  const barColors={high:'#68d391',mid:'#f6ad55',low:'#fc8181'};
+  obi$('cbarf').style.background=barColors[cls]||'var(--info)';
+  obi$('confMsg').textContent=msg;
+  obi$('confPct').textContent=pct>0?pct+'%':'';
+  obi$('cbarf').style.width=pct+'%';
+}
+
+function obiUpdateLcAlert(){
+  const lows=[];
+  for(const[p,s] of obiPgSettings.entries()) if(s.confidence<55&&s.source==='auto') lows.push(p);
+  const el=obi$('lcAlert');
+  if(lows.length>0){
+    el.style.display='flex';
+    obi$('lcMsg').textContent=`ページ ${lows.join('・')} は信頼度が低め。クリックして確認してください。`;
+  } else {
+    el.style.display='none';
+  }
+}
+
+function obiUpdateDots(){
+  const el=obi$('dots');
+  if(obiTotalPgs<=1){el.innerHTML='';return;}
+  const max=24;
+  const items=[];
+  for(let p=1;p<=Math.min(obiTotalPgs,max);p++){
+    const s=obiPgSettings.get(p);
+    let cls='obi-dot ';
+    if(!s) cls+='obi-dot-p';
+    else if(s.source==='manual') cls+='obi-dot-u';
+    else if(s.confidence>=80) cls+='obi-dot-h';
+    else if(s.confidence>=55) cls+='obi-dot-m';
+    else cls+='obi-dot-l';
+    if(p===obiCurPageNum) cls+=' obi-dot-cur';
+    items.push(`<span class="${cls}" onclick="obiShowPage(${p})" title="${p}ページ (信頼度:${s?s.confidence+'%':'未'})">${p}</span>`);
+  }
+  if(obiTotalPgs>max) items.push(`<span class="obi-dot obi-dot-p" style="cursor:default">…</span>`);
+  el.innerHTML=items.join('');
+}
+
+function obiUpdatePNav(){
+  const nav=obi$('pnav');
+  if(obiTotalPgs<=1){nav.style.display='none'; obi$('applyAllBtn').style.display='none'; return;}
+  nav.style.display='flex';
+  obi$('applyAllBtn').style.display='';
+  obi$('pgind').textContent=`${obiCurPageNum} / ${obiTotalPgs} ページ`;
+  obi$('btnP').disabled=obiCurPageNum<=1;
+  obi$('btnN').disabled=obiCurPageNum>=obiTotalPgs;
+}
+
+function obiRefreshOverlay(){
+  const canvas=obi$('pc');
+  const cline=obi$('cline');
+  const bovl=obi$('bovl');
+  const bovlImg=obi$('bovlImg');
+  const cW=canvas.offsetWidth;
+  const cH=canvas.offsetHeight||canvas.height;
+  if(!cH) return;
+  const cf=obiGetPageCutFrac(obiCurPageNum);
+  const cutPx=cf*cH;
+  if(obiBandPos==='bottom'){
+    cline.style.top=(cH-cutPx)+'px';
+    bovl.style.top=(cH-cutPx)+'px'; bovl.style.height=cutPx+'px';
+    bovl.style.borderTop='1.5px dashed rgba(229,62,62,.4)';
+    bovl.style.borderBottom='none';
+    obi$('clabel').style.top='-18px';
+  } else {
+    cline.style.top=cutPx+'px';
+    bovl.style.top='0px'; bovl.style.height=cutPx+'px';
+    bovl.style.borderTop='none';
+    bovl.style.borderBottom='1.5px dashed rgba(229,62,62,.4)';
+    obi$('clabel').style.top='4px';
+  }
+  obi$('cutVal').textContent=Math.round(cf*100)+'%';
+  if(obiBandImgNatW>0){
+    const drawW=cW*(obiBandWidthPct/100);
+    const drawH=drawW*(obiBandImgNatH/obiBandImgNatW);
+    const drawX=(cW-drawW)*obiBandHAlign;
+    const maxSlide=Math.max(0,cutPx-drawH);
+    bovlImg.style.width=drawW+'px';
+    bovlImg.style.height=drawH+'px';
+    bovlImg.style.left=drawX+'px';
+    bovlImg.style.bottom='auto';
+    if(obiBandPos==='bottom'){
+      bovlImg.style.top=maxSlide*(1-obiBandVertPct/100)+'px';
+    } else {
+      bovlImg.style.top=(maxSlide*(obiBandVertPct/100))+'px';
+    }
+  }
+}
+
+async function obiRenderMini(pg){
+  if(!pg||!obiBandUrl) return;
+  const mini=obi$('mc');
+  const sc=270/pg.getViewport({scale:1}).width*.85;
+  const vp=pg.getViewport({scale:sc});
+  mini.width=vp.width; mini.height=vp.height;
+  const ctx=mini.getContext('2d');
+  await pg.render({canvasContext:ctx,viewport:vp}).promise;
+  const cf=obiGetPageCutFrac(obiCurPageNum);
+  const cutPx=cf*mini.height;
+  const cutY=obiBandPos==='bottom'?mini.height-cutPx:0;
+  ctx.fillStyle='#fff';
+  ctx.fillRect(0,cutY,mini.width,cutPx);
+  if(obiBandImgEl&&obiBandImgNatW>0){
+    const drawW=mini.width*(obiBandWidthPct/100);
+    const drawH=drawW*(obiBandImgNatH/obiBandImgNatW);
+    const drawX=(mini.width-drawW)*obiBandHAlign;
+    const maxSlide=Math.max(0,cutPx-drawH);
+    const offset=maxSlide*(obiBandVertPct/100);
+    const drawY=obiBandPos==='bottom'?mini.height-drawH-offset:offset;
+    ctx.drawImage(obiBandImgEl,drawX,drawY,drawW,drawH);
+  }
+}
+
+function obiOnCutSlider(v){
+  const cf=v/100;
+  obiCutFrac=cf;
+  obiPgSettings.set(obiCurPageNum,{cutFrac:cf,confidence:100,source:'manual'});
+  obiUpdateDots();
+  obiShowConf(obiPgSettings.get(obiCurPageNum));
+  obiRefreshOverlay();
+  obiCurDoc&&obiCurDoc.getPage(obiCurPageNum).then(p=>obiRenderMini(p));
+}
+
+function obiOnWidthSlider(v){
+  obiBandWidthPct=Number(v);
+  obi$('wVal').textContent=v+'%';
+  obiRefreshOverlay();
+  obiCurDoc&&obiCurDoc.getPage(obiCurPageNum).then(p=>obiRenderMini(p));
+}
+
+function obiSetAlign(a){
+  obiBandHAlign=a;
+  obi$('aL').classList.toggle('on',a===0);
+  obi$('aC').classList.toggle('on',a===0.5);
+  obi$('aR').classList.toggle('on',a===1);
+  obiRefreshOverlay();
+  obiCurDoc&&obiCurDoc.getPage(obiCurPageNum).then(p=>obiRenderMini(p));
+}
+
+function obiOnVertSlider(v){
+  obiBandVertPct=Number(v);
+  const n=Number(v);
+  obi$('vVal').textContent=n===0?'ページ端':n===100?'カット位置':n+'%';
+  obiRefreshOverlay();
+  obiCurDoc&&obiCurDoc.getPage(obiCurPageNum).then(p=>obiRenderMini(p));
+}
+
+function obiSetPos(p){
+  obiBandPos=p;
+  obi$('bB').classList.toggle('on',p==='bottom');
+  obi$('bT').classList.toggle('on',p==='top');
+  obiPgSettings.clear();
+  obiDetectAllPages().then(()=>obiShowPage(obiCurPageNum)).then(()=>obiUpdateLcAlert());
+}
+
+function obiSaveCurPage(source,cf){
+  const prev=obiPgSettings.get(obiCurPageNum)||{confidence:50};
+  const newCF=cf!==undefined?cf:obiGetPageCutFrac(obiCurPageNum);
+  obiPgSettings.set(obiCurPageNum,{cutFrac:newCF,confidence:source==='manual'?100:prev.confidence,source});
+  obiUpdateDots();
+  if(source==='manual') obiShowConf(obiPgSettings.get(obiCurPageNum));
+}
+
+async function obiStartProc(){
+  if(!obiBandFile||!obiPdfFiles.length) return;
+  obiSetPill(3,'done'); obiSetPill(4,'active');
+  const btn=obi$('procBtn'),pw=obi$('pwrap'),pb=obi$('pbar'),pl=obi$('plbl'),pc=obi$('pcnt'),db=obi$('dbtn'),rl=obi$('rlist');
+  btn.disabled=true; pw.style.display='block'; db.style.display='none'; rl.innerHTML=''; obiProcessed=[];
+  const bandAB=await obiBandFile.arrayBuffer();
+  const bandBytes=new Uint8Array(bandAB);
+  for(let i=0;i<obiPdfFiles.length;i++){
+    const f=obiPdfFiles[i];
+    pl.textContent=`処理中: ${f.name}`;
+    pb.style.width=`${(i/obiPdfFiles.length*100).toFixed(0)}%`;
+    pc.textContent=`${i+1} / ${obiPdfFiles.length}`;
+    try{
+      const bytes=new Uint8Array(await f.arrayBuffer());
+      const out=await obiReplaceBand(bytes,bandBytes);
+      const name=f.name.replace(/\.pdf$/i,'')+'_帯替え.pdf';
+      obiProcessed.push({name,bytes:out});
+      rl.innerHTML+=`<div class="obi-ri obi-ok">✅ ${esc(f.name)} → ${esc(name)}</div>`;
+    }catch(err){
+      console.error(f.name,err);
+      rl.innerHTML+=`<div class="obi-ri obi-ng">❌ ${esc(f.name)}: ${esc(err.message)}</div>`;
+    }
+    await obiTick();
+  }
+  pb.style.width='100%';
+  pl.textContent='処理完了！';
+  pc.textContent=`${obiProcessed.length} / ${obiPdfFiles.length} 件成功`;
+  btn.disabled=false;
+  if(obiProcessed.length>0){db.style.display='flex'; obiSetPill(4,'done');}
+}
+
+async function obiReplaceBand(pdfBytes,bandImgBytes){
+  const {PDFDocument,rgb}=PDFLib;
+  const doc=await PDFDocument.load(pdfBytes,{ignoreEncryption:true});
+  const pages=doc.getPages();
+  const isPng=obiBandType==='image/png'||obiBandFile.name.toLowerCase().endsWith('.png');
+  let img;
+  try{ img=isPng?await doc.embedPng(bandImgBytes):await doc.embedJpg(bandImgBytes); }
+  catch(e){ img=isPng?await doc.embedJpg(bandImgBytes):await doc.embedPng(bandImgBytes); }
+  for(let i=0;i<pages.length;i++){
+    const pn=i+1;
+    let s=obiPgSettings.get(pn);
+    if(!s){
+      let nearest=null;
+      for(const k of obiPgSettings.keys()) if(k<=pn&&(nearest===null||k>nearest)) nearest=k;
+      s=nearest!==null?obiPgSettings.get(nearest):{cutFrac:0.15,confidence:50,source:'auto'};
+    }
+    const pg=pages[i];
+    const{width:W,height:H}=pg.getSize();
+    const cf=s.cutFrac;
+    const coverH=cf*H;
+    const coverY=obiBandPos==='bottom'?0:H-coverH;
+    pg.drawRectangle({x:0,y:coverY,width:W,height:coverH,color:rgb(1,1,1),opacity:1});
+    const imgDims=img.scale(1);
+    const drawW=W*(obiBandWidthPct/100);
+    const drawH=drawW*(imgDims.height/imgDims.width);
+    const drawX=(W-drawW)*obiBandHAlign;
+    const maxSlide=Math.max(0,coverH-drawH);
+    const offset=maxSlide*(obiBandVertPct/100);
+    const drawY=obiBandPos==='bottom'?offset:H-drawH-offset;
+    pg.drawImage(img,{x:drawX,y:drawY,width:drawW,height:drawH});
+  }
+  return await doc.save();
+}
+
+async function obiDoDownload(){
+  if(!obiProcessed.length) return;
+  if(obiProcessed.length===1){
+    obiTriggerDl(URL.createObjectURL(new Blob([obiProcessed[0].bytes],{type:'application/pdf'})),obiProcessed[0].name);
+  } else {
+    const zip=new JSZip();
+    obiProcessed.forEach(({name,bytes})=>zip.file(name,bytes));
+    obiTriggerDl(URL.createObjectURL(await zip.generateAsync({type:'blob',compression:'DEFLATE'})),`帯替え済み_${new Date().toISOString().slice(0,10)}.zip`);
+  }
+}
+
+function obiTriggerDl(url,name){
+  const a=document.createElement('a');
+  a.href=url; a.download=name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},500);
+}
+
+function obiSetupDrop(id,onFile){
+  const el=obi$(id);
+  el.addEventListener('dragover',e=>{e.preventDefault();el.classList.add('over');});
+  el.addEventListener('dragleave',()=>el.classList.remove('over'));
+  el.addEventListener('drop',e=>{
+    e.preventDefault();el.classList.remove('over');
+    Array.from(e.dataTransfer.files).forEach(f=>onFile(f));
+  });
+}
+
+// Document-level drag events for cut line (guarded by obiDragging)
+document.addEventListener('mousemove',e=>{
+  if(!obiDragging) return;
+  const r=obi$('cwrap').getBoundingClientRect();
+  const rel=(e.clientY-r.top)/r.height;
+  const cf=obiBandPos==='bottom'?1-rel:rel;
+  const cfC=Math.max(.02,Math.min(.48,cf));
+  obiCutFrac=cfC;
+  obiPgSettings.set(obiCurPageNum,{cutFrac:cfC,confidence:100,source:'manual'});
+  obi$('cutSlider').value=Math.round(cfC*100);
+  obiUpdateDots();
+  obiShowConf(obiPgSettings.get(obiCurPageNum));
+  obiRefreshOverlay();
+});
+document.addEventListener('touchmove',e=>{
+  if(!obiDragging) return;
+  const r=obi$('cwrap').getBoundingClientRect();
+  const rel=(e.touches[0].clientY-r.top)/r.height;
+  const cf=obiBandPos==='bottom'?1-rel:rel;
+  const cfC=Math.max(.02,Math.min(.48,cf));
+  obiCutFrac=cfC;
+  obiPgSettings.set(obiCurPageNum,{cutFrac:cfC,confidence:100,source:'manual'});
+  obi$('cutSlider').value=Math.round(cfC*100);
+  obiUpdateDots();
+  obiShowConf(obiPgSettings.get(obiCurPageNum));
+  obiRefreshOverlay();
+},{passive:true});
+document.addEventListener('mouseup',async()=>{
+  if(!obiDragging) return;
+  obiDragging=false;
+  if(obiCurDoc) obiRenderMini(await obiCurDoc.getPage(obiCurPageNum));
+});
+document.addEventListener('touchend',async()=>{
+  if(!obiDragging) return;
+  obiDragging=false;
+  if(obiCurDoc) obiRenderMini(await obiCurDoc.getPage(obiCurPageNum));
+});
+
+// Resize handler for obi
+let _obiRt;
+window.addEventListener('resize',()=>{
+  clearTimeout(_obiRt);
+  _obiRt=setTimeout(async()=>{
+    if(!obiCurDoc) return;
+    const pg=await obiCurDoc.getPage(obiCurPageNum);
+    const wrap=obi$('cwrap'),canvas=obi$('pc');
+    const vp=pg.getViewport({scale:wrap.clientWidth/pg.getViewport({scale:1}).width});
+    canvas.width=vp.width; canvas.height=vp.height;
+    await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    obiRefreshOverlay();
+  },300);
+});
+
+function obiInit(){
+  obiSetupDrop('bandDrop',f=>f.type.startsWith('image/')&&obiLoadBand(f));
+  obi$('bandIn').addEventListener('change',e=>{if(e.target.files[0])obiLoadBand(e.target.files[0]);e.target.value='';});
+  obiSetupDrop('pdfDrop',f=>f.name.toLowerCase().endsWith('.pdf')&&obiAddFiles([f]));
+  obi$('pdfIn').addEventListener('change',e=>{obiAddFiles(Array.from(e.target.files));e.target.value='';});
+  obi$('cline').addEventListener('mousedown',e=>{obiDragging=true;e.preventDefault();});
+  obi$('cline').addEventListener('touchstart',e=>{obiDragging=true;e.preventDefault();},{passive:false});
+}
+obiInit();
 
 /* ── Bootstrap ── */
 openIDB().then(async () => {
