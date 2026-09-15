@@ -419,6 +419,38 @@
     .obi-ri{font-size:12px;padding:4px 9px;border-radius:5px;display:flex;align-items:center;gap:5px}
     .obi-ri.obi-ok{background:#f0fff4;color:#276749}
     .obi-ri.obi-ng{background:#fff5f5;color:#c53030}
+
+    /* ── Obi free-position boxes & rotation (v2) ── */
+    .obi-box{position:absolute;box-sizing:border-box;cursor:move;touch-action:none;z-index:15}
+    .obi-box.obi-cutbox{border:2px dashed #e53e3e;background:rgba(229,62,62,.14)}
+    .obi-box.obi-bandbox{border:2px solid var(--info);background:rgba(49,130,206,.10);overflow:hidden;z-index:16}
+    .obi-box .obi-bandimg{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;opacity:.9;pointer-events:none}
+    .obi-box .obi-boxlabel{position:absolute;top:-19px;left:-2px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap;pointer-events:none}
+    .obi-cutbox .obi-boxlabel{background:#e53e3e;color:#fff}
+    .obi-bandbox .obi-boxlabel{background:var(--info);color:#fff}
+    .obi-handle{position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;z-index:20;touch-action:none}
+    .obi-cutbox .obi-handle{border:3px solid #e53e3e}
+    .obi-bandbox .obi-handle{border:3px solid var(--info)}
+    .obi-handle.tl{left:-8px;top:-8px;cursor:nwse-resize}
+    .obi-handle.tr{right:-8px;top:-8px;cursor:nesw-resize}
+    .obi-handle.bl{left:-8px;bottom:-8px;cursor:nesw-resize}
+    .obi-handle.br{right:-8px;bottom:-8px;cursor:nwse-resize}
+    .obi-rot-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:9px 11px;background:var(--bg);border:1px solid var(--border);border-radius:8px}
+    .obi-rotbtn{width:34px;height:34px;flex-shrink:0;border:1.5px solid var(--border);border-radius:7px;background:white;cursor:pointer;font-size:16px;transition:all .15s}
+    .obi-rotbtn:hover{border-color:var(--info);background:#ebf8ff}
+    .obi-rot-mid{flex:1;text-align:center}
+    .obi-rot-deg{font-size:14px;font-weight:800;color:var(--info)}
+    .obi-rot-sub{font-size:9px;color:var(--text-muted)}
+    .obi-hint{font-size:10.5px;color:var(--text-muted);margin-bottom:12px;line-height:1.5;display:flex;gap:5px}
+
+    /* ── 案内キット ── */
+    .kit-prop-card{border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;background:var(--bg)}
+    .kit-prop-top{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+    .kit-doc-item{display:flex;align-items:center;gap:8px;padding:7px 9px;background:white;border:1px solid var(--border);border-radius:7px;font-size:12px;margin-bottom:6px}
+    .kit-doc-item .dn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .kit-doc-item select{font-size:11px;padding:4px 6px;border:1.5px solid var(--border);border-radius:5px;font-family:inherit;flex-shrink:0;background:white}
+    .kit-drop{border:2px dashed #bee3f8;border-radius:8px;padding:12px 10px;text-align:center;cursor:pointer;transition:all .2s;background:#ebf8ff;font-size:11.5px;color:var(--text)}
+    .kit-drop:hover,.kit-drop.over{border-color:var(--info);background:#dbeafe}
   </style>
 </head>
 <body>
@@ -539,7 +571,7 @@
       <div class="card" id="o-prevCard" style="display:none;padding:20px;margin-bottom:16px">
         <div class="card-header" style="margin:-20px -20px 14px;padding:12px 16px">🔍 STEP 3｜自動検出 ＆ 微調整</div>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
-          各ページの帯を自動検出します。<strong>信頼度が低いページのみ</strong>赤く表示されます。赤い線をドラッグして微調整できます。
+          各ページを自動検出します（上下どちらの帯かも自動判定）。<strong>赤枠＝白塗りする範囲／青枠＝新しい帯の配置</strong>です。ページごとに向き・位置・サイズを自由に調整できます。
         </p>
 
         <div id="o-lcAlert" style="display:none;background:#fff5f5;border:1px solid #fc8181;border-radius:8px;padding:9px 13px;font-size:12px;color:#c53030;margin-bottom:10px;align-items:center;gap:8px">
@@ -561,13 +593,22 @@
               <button class="obi-navbtn" id="o-btnN" onclick="obiNavPage(1)" disabled>次 ▶</button>
             </div>
 
-            <div id="o-cwrap" style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#edf2f7;line-height:0;user-select:none">
+            <div id="o-cwrap" style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#edf2f7;line-height:0;user-select:none;touch-action:none">
               <canvas id="o-pc" style="display:block;width:100%;height:auto"></canvas>
-              <div id="o-cline" style="position:absolute;left:0;right:0;height:2px;background:#e53e3e;cursor:ns-resize;z-index:20;filter:drop-shadow(0 0 3px rgba(229,62,62,.7))">
-                <span id="o-clabel" style="position:absolute;right:6px;background:#e53e3e;color:white;font-size:10px;padding:2px 6px;border-radius:3px;pointer-events:none;font-weight:600;white-space:nowrap">▲ 帯の上端（ドラッグで調整）</span>
+              <div class="obi-box obi-cutbox" id="o-cutBox">
+                <div class="obi-boxlabel">白塗り範囲</div>
+                <div class="obi-handle tl" data-corner="tl"></div>
+                <div class="obi-handle tr" data-corner="tr"></div>
+                <div class="obi-handle bl" data-corner="bl"></div>
+                <div class="obi-handle br" data-corner="br"></div>
               </div>
-              <div id="o-bovl" style="position:absolute;left:0;right:0;pointer-events:none;z-index:10;overflow:hidden;background:rgba(229,62,62,.06);border-top:1.5px dashed rgba(229,62,62,.4)">
-                <img id="o-bovlImg" src="" alt="" style="position:absolute;opacity:.65">
+              <div class="obi-box obi-bandbox" id="o-bandBox">
+                <img class="obi-bandimg" id="o-bandBoxImg" src="" alt="">
+                <div class="obi-boxlabel">新しい帯</div>
+                <div class="obi-handle tl" data-corner="tl"></div>
+                <div class="obi-handle tr" data-corner="tr"></div>
+                <div class="obi-handle bl" data-corner="bl"></div>
+                <div class="obi-handle br" data-corner="br"></div>
               </div>
             </div>
           </div>
@@ -586,57 +627,20 @@
               <span id="o-confPct" style="font-size:13px;font-weight:800"></span>
             </div>
 
-            <!-- Band position -->
-            <div style="margin-bottom:14px">
-              <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px">帯の位置</div>
-              <div style="display:flex;border:1.5px solid var(--border);border-radius:7px;overflow:hidden">
-                <button class="obi-sb on" id="o-bB" onclick="obiSetPos('bottom')">下部（一般的）</button>
-                <button class="obi-sb" id="o-bT" onclick="obiSetPos('top')">上部</button>
+            <!-- Rotation -->
+            <div class="obi-rot-row">
+              <button class="obi-rotbtn" onclick="obiRotateCurrent(-90)" title="反時計回りに90°">⟲</button>
+              <div class="obi-rot-mid">
+                <div class="obi-rot-deg" id="o-rotDeg">0°</div>
+                <div class="obi-rot-sub" id="o-rotSub">この図面の表示角度</div>
               </div>
+              <button class="obi-rotbtn" onclick="obiRotateCurrent(90)" title="時計回りに90°">⟳</button>
             </div>
 
-            <!-- Cut slider -->
-            <div style="margin-bottom:14px">
-              <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px;display:flex;justify-content:space-between">
-                カット位置（白塗り範囲）<span style="color:var(--primary);font-size:13px;font-weight:700" id="o-cutVal">15%</span>
-              </div>
-              <input type="range" id="o-cutSlider" min="3" max="45" value="15" oninput="obiOnCutSlider(this.value)" style="width:100%;accent-color:var(--primary)">
-              <div style="font-size:10px;color:var(--text-muted);margin-top:3px">赤い線をドラッグするか、スライダーで微調整</div>
-            </div>
-
-            <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
-
-            <!-- Width slider -->
-            <div style="margin-bottom:14px">
-              <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px;display:flex;justify-content:space-between">
-                自社帯の横幅 <span style="color:var(--primary);font-size:13px;font-weight:700" id="o-wVal">100%</span>
-              </div>
-              <input type="range" id="o-wSlider" min="40" max="100" value="100" oninput="obiOnWidthSlider(this.value)" style="width:100%;accent-color:var(--primary)">
-            </div>
-
-            <!-- Alignment -->
-            <div style="margin-bottom:14px">
-              <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px">横位置</div>
-              <div style="display:flex;border:1.5px solid var(--border);border-radius:7px;overflow:hidden">
-                <button class="obi-sb on" id="o-aL" onclick="obiSetAlign(0)">左揃え</button>
-                <button class="obi-sb" id="o-aC" onclick="obiSetAlign(0.5)">中央</button>
-                <button class="obi-sb" id="o-aR" onclick="obiSetAlign(1)">右揃え</button>
-              </div>
-            </div>
-
-            <!-- Vertical slider -->
-            <div style="margin-bottom:14px">
-              <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px;display:flex;justify-content:space-between">
-                帯の縦位置（カット範囲内）<span style="color:var(--primary);font-size:13px;font-weight:700" id="o-vVal">ページ端</span>
-              </div>
-              <input type="range" id="o-vSlider" min="0" max="100" value="0" oninput="obiOnVertSlider(this.value)" style="width:100%;accent-color:var(--primary)">
-              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:2px">
-                <span>ページ端</span><span>カット位置</span>
-              </div>
-            </div>
+            <div class="obi-hint">🖐️ <span>枠の内側をドラッグで移動、四隅の丸をドラッグでサイズ変更できます（青枠は縦横比を保持します）。</span></div>
 
             <button class="btn btn-secondary" style="width:100%;margin-bottom:5px" onclick="obiReDetect()">🔄 このページを再検出</button>
-            <button class="btn btn-secondary" id="o-applyAllBtn" style="display:none;width:100%" onclick="obiApplyAll()">✅ この設定を全ページに適用</button>
+            <button class="btn btn-secondary" id="o-applyAllBtn" style="display:none;width:100%" onclick="obiApplyAll()">✅ この設定をこのPDFの全ページに適用</button>
 
             <!-- Mini preview -->
             <div style="margin-top:15px">
@@ -672,6 +676,144 @@
 
 <div class="toast-wrap" id="toasts"></div>
 <div id="mc"></div>
+
+<!-- ============================================================
+     KIT VIEWER TEMPLATE — 生成される案内キットファイルの雛形
+     この <template> の中身はブラウザに実行されず、生成時に
+     テキストとして取り出してプレースホルダーを差し替えるだけ。
+     ============================================================ -->
+<template id="kit-viewer-template">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Hiragino Sans','Meiryo',sans-serif;background:#f0f4f8;color:#2d3748;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+.vheader{background:linear-gradient(135deg,#1a365d,#2b6cb0);color:white;padding:12px 16px;flex-shrink:0}
+.vheader h1{font-size:16px;font-weight:700}
+.vheader p{font-size:11px;opacity:.8;margin-top:2px}
+.layout{flex:1;display:flex;overflow:hidden}
+nav#propNav{width:220px;flex-shrink:0;background:white;border-right:1px solid #e2e8f0;overflow-y:auto;padding:8px}
+.pnav-item{padding:10px 11px;border-radius:8px;font-size:12.5px;font-weight:600;color:#4a5568;cursor:pointer;margin-bottom:3px;transition:all .15s;border:1.5px solid transparent}
+.pnav-item:hover{background:#f7fafc}
+.pnav-item.active{background:#ebf8ff;color:#2b6cb0;border-color:#bee3f8}
+.pnav-item .cnt{font-size:10px;color:#a0aec0;font-weight:400;display:block;margin-top:2px}
+.pnav-item.active .cnt{color:#63b3ed}
+main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.doc-tabs{flex-shrink:0;display:flex;gap:6px;overflow-x:auto;padding:9px 12px;background:white;border-bottom:1px solid #e2e8f0}
+.doc-tab{flex-shrink:0;padding:7px 13px;border-radius:999px;font-size:11.5px;font-weight:600;background:#f0f4f8;color:#718096;cursor:pointer;white-space:nowrap;border:1.5px solid transparent;transition:all .15s}
+.doc-tab.active{background:#2b6cb0;color:white}
+.doc-view{flex:1;position:relative;background:#e2e8f0;overflow:auto}
+.doc-view iframe{position:absolute;inset:0;width:100%;height:100%;border:none;background:white}
+.doc-view .imgwrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;background:#e2e8f0}
+.doc-view img{max-width:100%;height:auto;display:block}
+.empty-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#a0aec0;font-size:13px;text-align:center;padding:20px}
+@media(max-width:680px){
+  nav#propNav{width:100%;height:auto;max-height:96px;border-right:none;border-bottom:1px solid #e2e8f0;display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;padding:8px}
+  .pnav-item{flex-shrink:0;min-width:130px;margin-bottom:0}
+  .layout{flex-direction:column}
+}
+</style>
+<div id="app">
+  <div class="vheader">
+    <h1 id="vTitle">案内キット</h1>
+    <p id="vSubtitle"></p>
+  </div>
+  <div class="layout">
+    <nav id="propNav"></nav>
+    <main>
+      <div class="doc-tabs" id="docTabs"></div>
+      <div class="doc-view" id="docView"><div class="empty-msg">左のメニューから物件を選択してください</div></div>
+    </main>
+  </div>
+</div>
+<script type="application/json" id="kitData">__KIT_DATA_JSON__</script>
+<script>
+(function(){
+  var kit = JSON.parse(document.getElementById('kitData').textContent);
+  var curProp = 0, curDoc = 0, curUrl = null;
+
+  function fmtDate(s){
+    if(!s) return '';
+    var p = s.split('-');
+    if(p.length!==3) return s;
+    return p[0] + '年' + parseInt(p[1],10) + '月' + parseInt(p[2],10) + '日';
+  }
+
+  function b64ToUrl(b64, mime){
+    var bin = atob(b64);
+    var len = bin.length;
+    var bytes = new Uint8Array(len);
+    for(var i=0;i<len;i++) bytes[i] = bin.charCodeAt(i);
+    var blob = new Blob([bytes], {type: mime || 'application/octet-stream'});
+    return URL.createObjectURL(blob);
+  }
+
+  function renderHeader(){
+    document.getElementById('vTitle').textContent = (kit.customerName || 'お客様') + ' 様 ご案内資料';
+    var sub = (kit.properties||[]).length + '件の物件';
+    if(kit.visitDate) sub = fmtDate(kit.visitDate) + ' ご案内　・　' + sub;
+    document.getElementById('vSubtitle').textContent = sub;
+    document.title = (kit.customerName||'案内キット') + ' 様 ご案内資料';
+  }
+
+  function renderNav(){
+    var nav = document.getElementById('propNav');
+    nav.innerHTML = '';
+    (kit.properties||[]).forEach(function(p, i){
+      var el = document.createElement('div');
+      el.className = 'pnav-item' + (i===curProp?' active':'');
+      el.innerHTML = '<div>' + escapeHtml(p.name || ('物件' + (i+1))) + '</div><span class="cnt">' + (p.documents||[]).length + '件の資料</span>';
+      el.addEventListener('click', function(){ curProp = i; curDoc = 0; renderNav(); renderTabs(); });
+      nav.appendChild(el);
+    });
+  }
+
+  function renderTabs(){
+    var tabs = document.getElementById('docTabs');
+    tabs.innerHTML = '';
+    var prop = (kit.properties||[])[curProp];
+    var docs = prop ? (prop.documents||[]) : [];
+    if(!docs.length){
+      document.getElementById('docView').innerHTML = '<div class="empty-msg">この物件には資料が登録されていません</div>';
+      return;
+    }
+    docs.forEach(function(d, i){
+      var b = document.createElement('div');
+      b.className = 'doc-tab' + (i===curDoc?' active':'');
+      b.textContent = d.label || d.filename || ('資料' + (i+1));
+      b.addEventListener('click', function(){ curDoc = i; renderTabs(); renderDoc(); });
+      tabs.appendChild(b);
+    });
+    renderDoc();
+  }
+
+  function renderDoc(){
+    var prop = (kit.properties||[])[curProp];
+    var doc = prop ? (prop.documents||[])[curDoc] : null;
+    var view = document.getElementById('docView');
+    if(curUrl){ URL.revokeObjectURL(curUrl); curUrl = null; }
+    if(!doc){ view.innerHTML = '<div class="empty-msg">資料が見つかりません</div>'; return; }
+    var url = b64ToUrl(doc.data, doc.mime);
+    curUrl = url;
+    if((doc.mime||'').indexOf('image/') === 0){
+      view.innerHTML = '<div class="imgwrap"><img src="" alt=""></div>';
+      view.querySelector('img').src = url;
+    } else {
+      view.innerHTML = '<iframe src="" title="document"></iframe>';
+      view.querySelector('iframe').src = url;
+    }
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  renderHeader();
+  renderNav();
+  renderTabs();
+})();
+</script>
+</template>
 
 <!-- ═══════════════ SCRIPT ═══════════════ -->
 <script>
@@ -2732,6 +2874,7 @@ function renderCusts() {
       <td><span style="background:var(--primary);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px">${cnt}件</span></td>
       <td style="font-size:11px;color:var(--text-muted);white-space:nowrap">${c.ts?new Date(c.ts).toLocaleDateString('ja-JP'):'-'}</td>
       <td onclick="event.stopPropagation()">
+        <button class="btn btn-accent btn-xs" onclick="kitOpen('${c.id}')">📦 案内キット</button>
         <button class="btn btn-secondary btn-xs" onclick="showCustModal('${c.id}')">編集</button>
         <button class="btn btn-danger btn-xs" onclick="delCust('${c.id}')">削除</button>
       </td>
@@ -5433,32 +5576,65 @@ function delTask(taskId, propId, fromModal) {
   if (propId) showPropDetail(propId);
 }
 
-/* ── Obi Tool ── */
+/* ── Obi Tool (v2: rotation-aware, free-position boxes, per-file settings) ── */
 function obi$(id){ return document.getElementById('o-'+id); }
 function obiTick(){ return new Promise(r=>setTimeout(r,0)); }
 function obiSetPill(n,s){ obi$('pill'+n).className='obi-pill '+s; }
 function obiShow(id){ obi$(id).style.display=''; }
 function obiHide(id){ obi$(id).style.display='none'; }
+function obiNormRot(r){ return ((r%360)+360)%360; }
+
+/* Rotation-aware geometry: visual-space rect -> actual/unrotated PDF-space rect,
+   and the drawImage params that keep the image upright once the page's own
+   /Rotate is applied by a viewer. */
+function obiMapPoint(vx, vy, rot, W, H) {
+  switch (obiNormRot(rot)) {
+    case 0:   return { x: vx,     y: vy };
+    case 90:  return { x: W - vy, y: vx };
+    case 180: return { x: W - vx, y: H - vy };
+    case 270: return { x: vy,     y: H - vx };
+  }
+}
+function obiMapRect(vx, vy, vw, vh, rot, W, H) {
+  const pts = [
+    obiMapPoint(vx, vy, rot, W, H),
+    obiMapPoint(vx+vw, vy, rot, W, H),
+    obiMapPoint(vx, vy+vh, rot, W, H),
+    obiMapPoint(vx+vw, vy+vh, rot, W, H),
+  ];
+  const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const y0 = Math.min(...ys), y1 = Math.max(...ys);
+  return { x:x0, y:y0, w:x1-x0, h:y1-y0 };
+}
+function obiImageDrawParams(rect, rot) {
+  const r = obiNormRot(rot);
+  const D = PDFLib.degrees;
+  if (r===0)   return { x:rect.x,        y:rect.y,        width:rect.w, height:rect.h, rotate:D(0) };
+  if (r===90)  return { x:rect.x+rect.w, y:rect.y,        width:rect.h, height:rect.w, rotate:D(90) };
+  if (r===180) return { x:rect.x+rect.w, y:rect.y+rect.h, width:rect.w, height:rect.h, rotate:D(180) };
+  if (r===270) return { x:rect.x,        y:rect.y+rect.h, width:rect.h, height:rect.w, rotate:D(270) };
+}
 
 // Obi global state
 let obiBandFile=null, obiBandUrl='', obiBandType='';
 let obiBandImgNatW=0, obiBandImgNatH=0;
 let obiBandImgEl=null;
-let obiPdfFiles=[], obiPreviewIdx=0;
-let obiCurDoc=null, obiCurPageNum=1, obiTotalPgs=1;
-let obiPgSettings=new Map();
-let obiCutFrac=0.15;
-let obiBandPos='bottom';
-let obiBandWidthPct=100;
-let obiBandHAlign=0;
-let obiBandVertPct=0;
-let obiProcessed=[];
-let obiDragging=false;
+let obiPdfFiles=[];      // [{id, file}]
+let obiFileSeq=0;
+let obiPreviewIdx=0;
 
-function obiGetPageCutFrac(pageNum){
-  const s=obiPgSettings.get(pageNum!=null?pageNum:obiCurPageNum);
-  return s?s.cutFrac:0.15;
-}
+// Per-file, per-page settings:
+// obiFileStates: Map<fileId, { totalPgs, pages: Map<pageNum, PageSetting> }>
+// PageSetting: { nativeRotate, extraRotate,
+//                cut:{x,y,w,h}, band:{x,y,w,h}   // top-down fractions (0..1) of the VISUAL (rotated) page
+//                confidence, source:'auto'|'manual' }
+let obiFileStates = new Map();
+let obiCurDoc=null, obiCurFileId=null, obiCurPageNum=1, obiTotalPgs=1;
+let obiProcessed=[];
+
+function obiGetFS(fileId){ return obiFileStates.get(fileId); }
+function obiGetPS(fileId,pageNum){ const fs=obiGetFS(fileId); return fs ? fs.pages.get(pageNum) : null; }
 
 function obiLoadBand(f){
   obiBandFile=f;
@@ -5472,26 +5648,34 @@ function obiLoadBand(f){
     obi$('bimg').src=obiBandUrl;
     obi$('bmeta').textContent=`${obiBandImgNatW} × ${obiBandImgNatH} px ／ ${(f.size/1024).toFixed(0)} KB`;
     obi$('bprev').style.display='block';
-    obi$('bovlImg').src=obiBandUrl;
+    obi$('bandBoxImg').src=obiBandUrl;
     obiSetPill(1,'done'); obiSetPill(2,'active');
     obiCheckReady();
-    obiRefreshOverlay();
-    obiRenderMini();
+    obiRenderBoxes();
+    obiCurDoc && obiCurDoc.getPage(obiCurPageNum).then(p=>obiRenderMini(p));
   };
   obiBandImgEl.src=obiBandUrl;
 }
 
 function obiAddFiles(files){
-  files.forEach(f=>{ if(!obiPdfFiles.some(x=>x.name===f.name&&x.size===f.size)) obiPdfFiles.push(f); });
+  files.forEach(f=>{
+    if(!obiPdfFiles.some(x=>x.file.name===f.name && x.file.size===f.size)){
+      obiFileSeq++;
+      obiPdfFiles.push({ id:'of'+obiFileSeq, file:f });
+    }
+  });
   obiRenderPList();
   obiCheckReady();
 }
 
-function obiRmPdf(i){
-  obiPdfFiles.splice(i,1);
+function obiRmPdf(id){
+  const idx=obiPdfFiles.findIndex(x=>x.id===id);
+  if(idx<0) return;
+  obiPdfFiles.splice(idx,1);
+  obiFileStates.delete(id);
   if(obiPreviewIdx>=obiPdfFiles.length) obiPreviewIdx=Math.max(0,obiPdfFiles.length-1);
   obiRenderPList();
-  if(!obiPdfFiles.length){ obiHide('prevCard'); obiHide('procCard'); }
+  if(!obiPdfFiles.length){ obiHide('prevCard'); obiHide('procCard'); obiCurDoc=null; obiCurFileId=null; }
   else obiLoadPreview();
 }
 
@@ -5503,12 +5687,23 @@ function obiRenderPList(){
     obi$('addmore').style.display='none';
     return;
   }
-  el.innerHTML=obiPdfFiles.map((f,i)=>`<div class="obi-pi${i===obiPreviewIdx?' sel':''}" onclick="obiSelPdf(${i})"><span style="font-size:14px">📄</span><span class="pn" title="${esc(f.name)}">${esc(f.name)}</span><span class="ps">${(f.size/1024).toFixed(0)}KB</span><span class="px" onclick="event.stopPropagation();obiRmPdf(${i})">✕</span></div>`).join('');
+  el.innerHTML=obiPdfFiles.map((entry,i)=>{
+    const f=entry.file;
+    const done = obiFileStates.has(entry.id);
+    const tag = done ? '' : '<span style="color:#cbd5e0">（未検出）</span>';
+    return `<div class="obi-pi${i===obiPreviewIdx?' sel':''}" onclick="obiSelPdf('${entry.id}')"><span style="font-size:14px">📄</span><span class="pn" title="${esc(f.name)}">${esc(f.name)}</span>${tag}<span class="ps">${(f.size/1024).toFixed(0)}KB</span><span class="px" onclick="event.stopPropagation();obiRmPdf('${entry.id}')">✕</span></div>`;
+  }).join('');
   obi$('pcount').textContent=`${obiPdfFiles.length}件`;
   obi$('addmore').style.display='';
 }
 
-function obiSelPdf(i){ obiPreviewIdx=i; obiRenderPList(); obiLoadPreview(); }
+function obiSelPdf(id){
+  const idx=obiPdfFiles.findIndex(x=>x.id===id);
+  if(idx<0) return;
+  obiPreviewIdx=idx;
+  obiRenderPList();
+  obiLoadPreview();
+}
 
 function obiCheckReady(){
   if(obiBandFile&&obiPdfFiles.length>0){
@@ -5519,40 +5714,80 @@ function obiCheckReady(){
 }
 
 async function obiLoadPreview(){
-  const file=obiPdfFiles[obiPreviewIdx];
-  if(!file) return;
+  const entry=obiPdfFiles[obiPreviewIdx];
+  if(!entry) return;
+  obiCurFileId=entry.id;
+  const file=entry.file;
   obiSetConf('loading','⏳ PDFを読み込み中...',0);
-  obiPgSettings.clear();
-  obiCurPageNum=1;
   const ab=await file.arrayBuffer();
   obiCurDoc=await pdfjsLib.getDocument({data:ab}).promise;
   obiTotalPgs=obiCurDoc.numPages;
-  obi$('pfname').textContent=`プレビュー: ${file.name}（${obiTotalPgs}ページ）`+(obiPdfFiles.length>1?` — 全${obiPdfFiles.length}件に適用`:'');
-  await obiDetectAllPages();
+  obi$('pfname').textContent=`プレビュー: ${file.name}（${obiTotalPgs}ページ）`+(obiPdfFiles.length>1?` — 全${obiPdfFiles.length}件中`:'');
+
+  if(!obiFileStates.has(obiCurFileId)){
+    obiFileStates.set(obiCurFileId, { totalPgs:obiTotalPgs, pages:new Map() });
+    await obiDetectAllPagesForCurrentFile();
+    obiRenderPList();
+  }
+
   await obiShowPage(1);
   obiUpdateLcAlert();
 }
 
-async function obiDetectAllPages(){
+async function obiDetectAllPagesForCurrentFile(){
+  const fs=obiGetFS(obiCurFileId);
   for(let p=1;p<=obiTotalPgs;p++){
     obiSetConf('loading',`⏳ ページ ${p}/${obiTotalPgs} を解析中...`,0);
     const pg=await obiCurDoc.getPage(p);
-    const result=await obiDetectPage(pg,obiBandPos);
-    obiPgSettings.set(p,{cutFrac:result.frac,confidence:result.conf,source:'auto'});
+    const nativeRotate=obiNormRot(pg.rotate||0);
+    const ps=await obiAutoDetectPage(pg, nativeRotate, 0);
+    fs.pages.set(p, ps);
     obiUpdateDots();
     await obiTick();
   }
 }
 
-async function obiDetectPage(pdfPage,pos){
-  const SCALE=1.5;
-  const vp=pdfPage.getViewport({scale:SCALE});
+async function obiAutoDetectPage(pdfPage, nativeRotate, extraRotate){
+  const effRot=obiNormRot(nativeRotate+extraRotate);
+  const SCALE=1.3;
+  const vp=pdfPage.getViewport({scale:SCALE, rotation:effRot});
   const tmp=document.createElement('canvas');
   tmp.width=vp.width; tmp.height=vp.height;
   await pdfPage.render({canvasContext:tmp.getContext('2d'),viewport:vp}).promise;
-  return obiDetectBand(tmp,pos);
+
+  const rBottom=obiDetectBand(tmp,'bottom');
+  const rTop=obiDetectBand(tmp,'top');
+  const pos = rBottom.conf>=rTop.conf ? 'bottom' : 'top';
+  const best = pos==='bottom' ? rBottom : rTop;
+
+  const h=best.frac;
+  const y = pos==='bottom' ? (1-h) : 0;
+  const cut = {x:0, y, w:1, h};
+  const band = obiFitBandBoxDefault(cut, pos, vp.width, vp.height);
+
+  return { nativeRotate, extraRotate, cut, band, confidence:best.conf, source:'auto' };
 }
 
+function obiFitBandBoxDefault(cutBox, pos, visW, visH){
+  if(!obiBandImgNatW) return { x:cutBox.x, y:cutBox.y, w:cutBox.w, h:cutBox.h };
+  const cutWpx=cutBox.w*visW, cutHpx=cutBox.h*visH;
+  const aspect=obiBandImgNatW/obiBandImgNatH;
+  let wpx=cutWpx, hpx=wpx/aspect;
+  if(hpx>cutHpx){ hpx=cutHpx; wpx=hpx*aspect; }
+  const xTopLeftPx = cutBox.x*visW;
+  let yTopLeftPx;
+  if(pos==='bottom'){
+    yTopLeftPx = (cutBox.y*visH) + (cutHpx - hpx);
+  } else {
+    yTopLeftPx = cutBox.y*visH;
+  }
+  return { x:xTopLeftPx/visW, y:yTopLeftPx/visH, w:wpx/visW, h:hpx/visH };
+}
+
+/**
+ * Multi-strategy band boundary detection (core heuristic unchanged).
+ * Returns { frac, conf } where conf is 0-100.
+ */
 function obiDetectBand(canvas,pos){
   const ctx=canvas.getContext('2d');
   const W=canvas.width,H=canvas.height;
@@ -5618,21 +5853,21 @@ function obiDetectBand(canvas,pos){
 async function obiShowPage(num){
   obiCurPageNum=num;
   const pg=await obiCurDoc.getPage(num);
-  const s=obiPgSettings.get(num)||{cutFrac:0.15,confidence:50,source:'auto'};
-  obiCutFrac=s.cutFrac;
-  const pct=Math.round(obiCutFrac*100);
-  obi$('cutSlider').value=pct; obi$('cutVal').textContent=pct+'%';
-  obi$('bB').classList.toggle('on',obiBandPos==='bottom');
-  obi$('bT').classList.toggle('on',obiBandPos==='top');
-  obiShowConf(s);
+  const ps=obiGetPS(obiCurFileId,num);
+
+  obiShowConf(ps);
+  obiUpdateRotUI(ps);
+
+  const effRot=obiNormRot(ps.nativeRotate+ps.extraRotate);
   const wrap=obi$('cwrap'),canvas=obi$('pc');
   const maxW=wrap.clientWidth||520;
-  const vp0=pg.getViewport({scale:1});
+  const vp0=pg.getViewport({scale:1, rotation:effRot});
   const sc=maxW/vp0.width;
-  const vp=pg.getViewport({scale:sc});
+  const vp=pg.getViewport({scale:sc, rotation:effRot});
   canvas.width=vp.width; canvas.height=vp.height;
   await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
-  obiRefreshOverlay();
+
+  obiRenderBoxes();
   obiUpdateDots();
   obiUpdatePNav();
   await obiRenderMini(pg);
@@ -5644,38 +5879,57 @@ async function obiNavPage(delta){
   await obiShowPage(next);
 }
 
-async function obiReDetect(){
+function obiUpdateRotUI(ps){
+  const eff=obiNormRot(ps.nativeRotate+ps.extraRotate);
+  obi$('rotDeg').textContent=eff+'°';
+  obi$('rotSub').textContent = ps.extraRotate!==0
+    ? `検出${ps.nativeRotate}° + 手動${ps.extraRotate}°`
+    : 'この図面の表示角度';
+}
+
+async function obiRotateCurrent(delta){
+  const ps=obiGetPS(obiCurFileId,obiCurPageNum);
+  ps.extraRotate=obiNormRot(ps.extraRotate+delta);
+  await obiRedetectCurrentPage();
+}
+
+async function obiRedetectCurrentPage(){
   obiSetConf('loading',`⏳ ページ ${obiCurPageNum} を再検出中...`,0);
   const pg=await obiCurDoc.getPage(obiCurPageNum);
-  const result=await obiDetectPage(pg,obiBandPos);
-  obiCutFrac=result.frac;
-  obiPgSettings.set(obiCurPageNum,{cutFrac:result.frac,confidence:result.conf,source:'auto'});
-  const pct=Math.round(obiCutFrac*100);
-  obi$('cutSlider').value=pct; obi$('cutVal').textContent=pct+'%';
-  obiShowConf(obiPgSettings.get(obiCurPageNum));
-  obiRefreshOverlay();
-  obiUpdateDots();
-  await obiRenderMini(await obiCurDoc.getPage(obiCurPageNum));
+  const prev=obiGetPS(obiCurFileId,obiCurPageNum);
+  const ps=await obiAutoDetectPage(pg, prev.nativeRotate, prev.extraRotate);
+  obiGetFS(obiCurFileId).pages.set(obiCurPageNum, ps);
+  await obiShowPage(obiCurPageNum);
   obiUpdateLcAlert();
 }
+async function obiReDetect(){ await obiRedetectCurrentPage(); }
 
 function obiApplyAll(){
-  const cf=obiGetPageCutFrac(obiCurPageNum);
-  for(let p=1;p<=obiTotalPgs;p++) obiPgSettings.set(p,{cutFrac:cf,source:'manual',confidence:100});
+  const src=obiGetPS(obiCurFileId,obiCurPageNum);
+  const fs=obiGetFS(obiCurFileId);
+  for(const [pn,ps] of fs.pages){
+    if(pn===obiCurPageNum) continue;
+    ps.cut={...src.cut};
+    ps.band={...src.band};
+    ps.extraRotate=src.extraRotate;
+    ps.source='manual';
+    ps.confidence=100;
+  }
+  src.source='manual'; src.confidence=100;
   obiUpdateDots();
-  obiSetConf('manual',`✅ 全${obiTotalPgs}ページに適用（高さ ${Math.round(cf*100)}%）`,100);
+  obiShowConf(src);
   obiUpdateLcAlert();
 }
 
-function obiShowConf(s){
-  const conf=s.confidence||0;
-  if(s.source==='manual'){
-    obiSetConf('manual',`✏️ 手動設定（高さ ${Math.round(s.cutFrac*100)}%）`,conf);
+function obiShowConf(ps){
+  const conf=ps.confidence||0;
+  if(ps.source==='manual'){
+    obiSetConf('manual',`✏️ 手動設定済み`,conf);
     return;
   }
   if(conf>=80) obiSetConf('high',`🟢 高精度検出完了（信頼度 ${conf}%）`,conf);
   else if(conf>=55) obiSetConf('mid',`🟡 中程度検出（信頼度 ${conf}%）— 要確認`,conf);
-  else obiSetConf('low',`🔴 低精度検出（信頼度 ${conf}%）— 赤線を確認`,conf);
+  else obiSetConf('low',`🔴 低精度検出（信頼度 ${conf}%）— 枠を確認`,conf);
 }
 
 function obiSetConf(cls,msg,pct){
@@ -5697,12 +5951,13 @@ function obiSetConf(cls,msg,pct){
 }
 
 function obiUpdateLcAlert(){
+  const fs=obiGetFS(obiCurFileId);
   const lows=[];
-  for(const[p,s] of obiPgSettings.entries()) if(s.confidence<55&&s.source==='auto') lows.push(p);
+  if(fs) for(const[p,s] of fs.pages.entries()) if(s.confidence<55&&s.source==='auto') lows.push(p);
   const el=obi$('lcAlert');
   if(lows.length>0){
     el.style.display='flex';
-    obi$('lcMsg').textContent=`ページ ${lows.join('・')} は信頼度が低め。クリックして確認してください。`;
+    obi$('lcMsg').textContent=`ページ ${lows.join('・')} は信頼度が低め。枠の位置を確認してください。`;
   } else {
     el.style.display='none';
   }
@@ -5711,10 +5966,11 @@ function obiUpdateLcAlert(){
 function obiUpdateDots(){
   const el=obi$('dots');
   if(obiTotalPgs<=1){el.innerHTML='';return;}
+  const fs=obiGetFS(obiCurFileId);
   const max=24;
   const items=[];
   for(let p=1;p<=Math.min(obiTotalPgs,max);p++){
-    const s=obiPgSettings.get(p);
+    const s=fs && fs.pages.get(p);
     let cls='obi-dot ';
     if(!s) cls+='obi-dot-p';
     else if(s.source==='manual') cls+='obi-dot-u';
@@ -5738,120 +5994,132 @@ function obiUpdatePNav(){
   obi$('btnN').disabled=obiCurPageNum>=obiTotalPgs;
 }
 
-function obiRefreshOverlay(){
+// ── Overlay boxes (free drag & resize) ────────
+
+function obiRenderBoxes(){
   const canvas=obi$('pc');
-  const cline=obi$('cline');
-  const bovl=obi$('bovl');
-  const bovlImg=obi$('bovlImg');
-  const cW=canvas.offsetWidth;
-  const cH=canvas.offsetHeight||canvas.height;
-  if(!cH) return;
-  const cf=obiGetPageCutFrac(obiCurPageNum);
-  const cutPx=cf*cH;
-  if(obiBandPos==='bottom'){
-    cline.style.top=(cH-cutPx)+'px';
-    bovl.style.top=(cH-cutPx)+'px'; bovl.style.height=cutPx+'px';
-    bovl.style.borderTop='1.5px dashed rgba(229,62,62,.4)';
-    bovl.style.borderBottom='none';
-    obi$('clabel').style.top='-18px';
-  } else {
-    cline.style.top=cutPx+'px';
-    bovl.style.top='0px'; bovl.style.height=cutPx+'px';
-    bovl.style.borderTop='none';
-    bovl.style.borderBottom='1.5px dashed rgba(229,62,62,.4)';
-    obi$('clabel').style.top='4px';
+  const cW=canvas.offsetWidth, cH=canvas.offsetHeight||canvas.height;
+  if(!cH || !obiCurFileId) return;
+  const ps=obiGetPS(obiCurFileId,obiCurPageNum);
+  if(!ps) return;
+  obiPlaceBoxPx('o-cutBox', obiFracToPx(ps.cut, cW, cH));
+  obiPlaceBoxPx('o-bandBox', obiFracToPx(ps.band, cW, cH));
+  obi$('bandBoxImg').src = obiBandUrl || '';
+}
+function obiFracToPx(rf, cw, ch){ return { x:rf.x*cw, y:rf.y*ch, w:rf.w*cw, h:rf.h*ch }; }
+function obiPxToFrac(rp, cw, ch){ return { x:rp.x/cw, y:rp.y/ch, w:rp.w/cw, h:rp.h/ch }; }
+function obiPlaceBoxPx(id, rp){
+  const el=document.getElementById(id);
+  el.style.left=rp.x+'px'; el.style.top=rp.y+'px';
+  el.style.width=rp.w+'px'; el.style.height=rp.h+'px';
+}
+
+function obiSetupBoxInteraction(boxId, kind){
+  const boxEl=document.getElementById(boxId);
+  let mode=null, activeCorner=null, startPt=null, startRectPx=null, containerRect=null;
+
+  function currentFrac(){
+    const ps=obiGetPS(obiCurFileId,obiCurPageNum);
+    return kind==='cut' ? ps.cut : ps.band;
   }
-  obi$('cutVal').textContent=Math.round(cf*100)+'%';
-  if(obiBandImgNatW>0){
-    const drawW=cW*(obiBandWidthPct/100);
-    const drawH=drawW*(obiBandImgNatH/obiBandImgNatW);
-    const drawX=(cW-drawW)*obiBandHAlign;
-    const maxSlide=Math.max(0,cutPx-drawH);
-    bovlImg.style.width=drawW+'px';
-    bovlImg.style.height=drawH+'px';
-    bovlImg.style.left=drawX+'px';
-    bovlImg.style.bottom='auto';
-    if(obiBandPos==='bottom'){
-      bovlImg.style.top=maxSlide*(1-obiBandVertPct/100)+'px';
-    } else {
-      bovlImg.style.top=(maxSlide*(obiBandVertPct/100))+'px';
+  function commitFrac(rf){
+    const ps=obiGetPS(obiCurFileId,obiCurPageNum);
+    if(kind==='cut') ps.cut=rf; else ps.band=rf;
+    ps.source='manual'; ps.confidence=100;
+  }
+  function pt(e){ return { x:e.clientX, y:e.clientY }; }
+
+  function onDown(e){
+    if(e.target.classList.contains('obi-handle')) return;
+    if(!obiCurFileId) return;
+    mode='move';
+    containerRect=obi$('cwrap').getBoundingClientRect();
+    startPt=pt(e);
+    startRectPx=obiFracToPx(currentFrac(), containerRect.width, containerRect.height);
+    e.preventDefault();
+  }
+  function onHandleDown(e, corner){
+    if(!obiCurFileId) return;
+    mode='resize'; activeCorner=corner;
+    containerRect=obi$('cwrap').getBoundingClientRect();
+    startPt=pt(e);
+    startRectPx=obiFracToPx(currentFrac(), containerRect.width, containerRect.height);
+    e.preventDefault(); e.stopPropagation();
+  }
+  function onMove(e){
+    if(!mode) return;
+    const cw=containerRect.width, ch=containerRect.height;
+    const p=pt(e);
+    if(mode==='move'){
+      let nx=startRectPx.x+(p.x-startPt.x);
+      let ny=startRectPx.y+(p.y-startPt.y);
+      nx=Math.max(0,Math.min(cw-startRectPx.w,nx));
+      ny=Math.max(0,Math.min(ch-startRectPx.h,ny));
+      const rp={x:nx,y:ny,w:startRectPx.w,h:startRectPx.h};
+      obiPlaceBoxPx(boxId, rp);
+      commitFrac(obiPxToFrac(rp,cw,ch));
+    } else if(mode==='resize'){
+      const anchor={
+        x: activeCorner.indexOf('r')>=0 ? startRectPx.x : startRectPx.x+startRectPx.w,
+        y: activeCorner.indexOf('b')>=0 ? startRectPx.y : startRectPx.y+startRectPx.h
+      };
+      const px=Math.max(0,Math.min(cw,p.x));
+      const py=Math.max(0,Math.min(ch,p.y));
+      let w=Math.abs(px-anchor.x), h=Math.abs(py-anchor.y);
+      if(kind==='band' && obiBandImgNatW){
+        const aspect=obiBandImgNatW/obiBandImgNatH;
+        w=Math.max(w, h*aspect);
+        h=w/aspect;
+      }
+      w=Math.max(8,w); h=Math.max(8,h);
+      const nx=activeCorner.indexOf('r')>=0 ? anchor.x : anchor.x-w;
+      const ny=activeCorner.indexOf('b')>=0 ? anchor.y : anchor.y-h;
+      const rp={x:nx,y:ny,w,h};
+      obiPlaceBoxPx(boxId, rp);
+      commitFrac(obiPxToFrac(rp,cw,ch));
     }
   }
+  function onUp(){
+    if(!mode) return;
+    mode=null; activeCorner=null;
+    if(!obiCurFileId) return;
+    obiShowConf(obiGetPS(obiCurFileId,obiCurPageNum));
+    obiUpdateDots();
+    obiCurDoc && obiCurDoc.getPage(obiCurPageNum).then(p=>obiRenderMini(p));
+  }
+
+  boxEl.addEventListener('pointerdown', onDown);
+  boxEl.querySelectorAll('.obi-handle').forEach(h=>{
+    h.addEventListener('pointerdown', e=>onHandleDown(e, h.dataset.corner));
+  });
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
 }
 
 async function obiRenderMini(pg){
-  if(!pg||!obiBandUrl) return;
+  if(!pg || !obiCurFileId) return;
+  const ps=obiGetPS(obiCurFileId,obiCurPageNum);
+  if(!ps) return;
+  const effRot=obiNormRot(ps.nativeRotate+ps.extraRotate);
   const mini=obi$('mc');
-  const sc=270/pg.getViewport({scale:1}).width*.85;
-  const vp=pg.getViewport({scale:sc});
+  const vp0=pg.getViewport({scale:1, rotation:effRot});
+  const sc=270/vp0.width*.85;
+  const vp=pg.getViewport({scale:sc, rotation:effRot});
   mini.width=vp.width; mini.height=vp.height;
   const ctx=mini.getContext('2d');
   await pg.render({canvasContext:ctx,viewport:vp}).promise;
-  const cf=obiGetPageCutFrac(obiCurPageNum);
-  const cutPx=cf*mini.height;
-  const cutY=obiBandPos==='bottom'?mini.height-cutPx:0;
+
   ctx.fillStyle='#fff';
-  ctx.fillRect(0,cutY,mini.width,cutPx);
-  if(obiBandImgEl&&obiBandImgNatW>0){
-    const drawW=mini.width*(obiBandWidthPct/100);
-    const drawH=drawW*(obiBandImgNatH/obiBandImgNatW);
-    const drawX=(mini.width-drawW)*obiBandHAlign;
-    const maxSlide=Math.max(0,cutPx-drawH);
-    const offset=maxSlide*(obiBandVertPct/100);
-    const drawY=obiBandPos==='bottom'?mini.height-drawH-offset:offset;
-    ctx.drawImage(obiBandImgEl,drawX,drawY,drawW,drawH);
+  ctx.fillRect(ps.cut.x*mini.width, ps.cut.y*mini.height, ps.cut.w*mini.width, ps.cut.h*mini.height);
+
+  if(obiBandImgEl && obiBandImgNatW>0){
+    ctx.drawImage(obiBandImgEl,
+      ps.band.x*mini.width, ps.band.y*mini.height,
+      ps.band.w*mini.width, ps.band.h*mini.height);
   }
 }
 
-function obiOnCutSlider(v){
-  const cf=v/100;
-  obiCutFrac=cf;
-  obiPgSettings.set(obiCurPageNum,{cutFrac:cf,confidence:100,source:'manual'});
-  obiUpdateDots();
-  obiShowConf(obiPgSettings.get(obiCurPageNum));
-  obiRefreshOverlay();
-  obiCurDoc&&obiCurDoc.getPage(obiCurPageNum).then(p=>obiRenderMini(p));
-}
-
-function obiOnWidthSlider(v){
-  obiBandWidthPct=Number(v);
-  obi$('wVal').textContent=v+'%';
-  obiRefreshOverlay();
-  obiCurDoc&&obiCurDoc.getPage(obiCurPageNum).then(p=>obiRenderMini(p));
-}
-
-function obiSetAlign(a){
-  obiBandHAlign=a;
-  obi$('aL').classList.toggle('on',a===0);
-  obi$('aC').classList.toggle('on',a===0.5);
-  obi$('aR').classList.toggle('on',a===1);
-  obiRefreshOverlay();
-  obiCurDoc&&obiCurDoc.getPage(obiCurPageNum).then(p=>obiRenderMini(p));
-}
-
-function obiOnVertSlider(v){
-  obiBandVertPct=Number(v);
-  const n=Number(v);
-  obi$('vVal').textContent=n===0?'ページ端':n===100?'カット位置':n+'%';
-  obiRefreshOverlay();
-  obiCurDoc&&obiCurDoc.getPage(obiCurPageNum).then(p=>obiRenderMini(p));
-}
-
-function obiSetPos(p){
-  obiBandPos=p;
-  obi$('bB').classList.toggle('on',p==='bottom');
-  obi$('bT').classList.toggle('on',p==='top');
-  obiPgSettings.clear();
-  obiDetectAllPages().then(()=>obiShowPage(obiCurPageNum)).then(()=>obiUpdateLcAlert());
-}
-
-function obiSaveCurPage(source,cf){
-  const prev=obiPgSettings.get(obiCurPageNum)||{confidence:50};
-  const newCF=cf!==undefined?cf:obiGetPageCutFrac(obiCurPageNum);
-  obiPgSettings.set(obiCurPageNum,{cutFrac:newCF,confidence:source==='manual'?100:prev.confidence,source});
-  obiUpdateDots();
-  if(source==='manual') obiShowConf(obiPgSettings.get(obiCurPageNum));
-}
+// ── STEP 4 — Processing ───────────────────────
 
 async function obiStartProc(){
   if(!obiBandFile||!obiPdfFiles.length) return;
@@ -5861,13 +6129,23 @@ async function obiStartProc(){
   const bandAB=await obiBandFile.arrayBuffer();
   const bandBytes=new Uint8Array(bandAB);
   for(let i=0;i<obiPdfFiles.length;i++){
-    const f=obiPdfFiles[i];
+    const entry=obiPdfFiles[i];
+    const f=entry.file;
     pl.textContent=`処理中: ${f.name}`;
     pb.style.width=`${(i/obiPdfFiles.length*100).toFixed(0)}%`;
     pc.textContent=`${i+1} / ${obiPdfFiles.length}`;
     try{
+      if(!obiFileStates.has(entry.id)){
+        const ab=await f.arrayBuffer();
+        const doc=await pdfjsLib.getDocument({data:ab}).promise;
+        obiFileStates.set(entry.id, { totalPgs:doc.numPages, pages:new Map() });
+        const savedCurFileId=obiCurFileId, savedCurDoc=obiCurDoc, savedTotalPgs=obiTotalPgs;
+        obiCurFileId=entry.id; obiCurDoc=doc; obiTotalPgs=doc.numPages;
+        await obiDetectAllPagesForCurrentFile();
+        obiCurFileId=savedCurFileId; obiCurDoc=savedCurDoc; obiTotalPgs=savedTotalPgs;
+      }
       const bytes=new Uint8Array(await f.arrayBuffer());
-      const out=await obiReplaceBand(bytes,bandBytes);
+      const out=await obiReplaceBandForFile(entry.id, bytes, bandBytes);
       const name=f.name.replace(/\.pdf$/i,'')+'_帯替え.pdf';
       obiProcessed.push({name,bytes:out});
       rl.innerHTML+=`<div class="obi-ri obi-ok">✅ ${esc(f.name)} → ${esc(name)}</div>`;
@@ -5884,36 +6162,49 @@ async function obiStartProc(){
   if(obiProcessed.length>0){db.style.display='flex'; obiSetPill(4,'done');}
 }
 
-async function obiReplaceBand(pdfBytes,bandImgBytes){
-  const {PDFDocument,rgb}=PDFLib;
+async function obiReplaceBandForFile(fileId, pdfBytes, bandImgBytes){
+  const {PDFDocument,rgb,degrees}=PDFLib;
   const doc=await PDFDocument.load(pdfBytes,{ignoreEncryption:true});
   const pages=doc.getPages();
   const isPng=obiBandType==='image/png'||obiBandFile.name.toLowerCase().endsWith('.png');
   let img;
   try{ img=isPng?await doc.embedPng(bandImgBytes):await doc.embedJpg(bandImgBytes); }
   catch(e){ img=isPng?await doc.embedJpg(bandImgBytes):await doc.embedPng(bandImgBytes); }
+
+  const fs=obiGetFS(fileId);
+
   for(let i=0;i<pages.length;i++){
     const pn=i+1;
-    let s=obiPgSettings.get(pn);
-    if(!s){
+    let ps=fs && fs.pages.get(pn);
+    if(!ps){
       let nearest=null;
-      for(const k of obiPgSettings.keys()) if(k<=pn&&(nearest===null||k>nearest)) nearest=k;
-      s=nearest!==null?obiPgSettings.get(nearest):{cutFrac:0.15,confidence:50,source:'auto'};
+      if(fs) for(const k of fs.pages.keys()) if(nearest===null||Math.abs(k-pn)<Math.abs(nearest-pn)) nearest=k;
+      ps=(fs&&nearest!=null) ? fs.pages.get(nearest)
+         : {nativeRotate:0, extraRotate:0, cut:{x:0,y:0.85,w:1,h:0.15}, band:{x:0,y:0.85,w:1,h:0.15}};
     }
+
     const pg=pages[i];
-    const{width:W,height:H}=pg.getSize();
-    const cf=s.cutFrac;
-    const coverH=cf*H;
-    const coverY=obiBandPos==='bottom'?0:H-coverH;
-    pg.drawRectangle({x:0,y:coverY,width:W,height:coverH,color:rgb(1,1,1),opacity:1});
-    const imgDims=img.scale(1);
-    const drawW=W*(obiBandWidthPct/100);
-    const drawH=drawW*(imgDims.height/imgDims.width);
-    const drawX=(W-drawW)*obiBandHAlign;
-    const maxSlide=Math.max(0,coverH-drawH);
-    const offset=maxSlide*(obiBandVertPct/100);
-    const drawY=obiBandPos==='bottom'?offset:H-drawH-offset;
-    pg.drawImage(img,{x:drawX,y:drawY,width:drawW,height:drawH});
+    const {width:W,height:H}=pg.getSize(); // unrotated MediaBox size
+    const effRot=obiNormRot((ps.nativeRotate||0)+(ps.extraRotate||0));
+    const visW = (effRot===90||effRot===270) ? H : W;
+    const visH = (effRot===90||effRot===270) ? W : H;
+
+    function toActualRect(boxFrac){
+      const vw=boxFrac.w*visW, vh=boxFrac.h*visH;
+      const vxLeft=boxFrac.x*visW;
+      const vyTop=boxFrac.y*visH;
+      const vyFromBottom=visH-vyTop-vh; // top-down fraction -> bottom-up visual coords
+      return obiMapRect(vxLeft, vyFromBottom, vw, vh, effRot, W, H);
+    }
+
+    const cutRect=toActualRect(ps.cut);
+    pg.drawRectangle({x:cutRect.x,y:cutRect.y,width:cutRect.w,height:cutRect.h,color:rgb(1,1,1),opacity:1});
+
+    const bandRect=toActualRect(ps.band);
+    const params=obiImageDrawParams(bandRect, effRot);
+    pg.drawImage(img, params);
+
+    pg.setRotation(degrees(effRot));
   }
   return await doc.save();
 }
@@ -5946,56 +6237,13 @@ function obiSetupDrop(id,onFile){
   });
 }
 
-// Document-level drag events for cut line (guarded by obiDragging)
-document.addEventListener('mousemove',e=>{
-  if(!obiDragging) return;
-  const r=obi$('cwrap').getBoundingClientRect();
-  const rel=(e.clientY-r.top)/r.height;
-  const cf=obiBandPos==='bottom'?1-rel:rel;
-  const cfC=Math.max(.02,Math.min(.48,cf));
-  obiCutFrac=cfC;
-  obiPgSettings.set(obiCurPageNum,{cutFrac:cfC,confidence:100,source:'manual'});
-  obi$('cutSlider').value=Math.round(cfC*100);
-  obiUpdateDots();
-  obiShowConf(obiPgSettings.get(obiCurPageNum));
-  obiRefreshOverlay();
-});
-document.addEventListener('touchmove',e=>{
-  if(!obiDragging) return;
-  const r=obi$('cwrap').getBoundingClientRect();
-  const rel=(e.touches[0].clientY-r.top)/r.height;
-  const cf=obiBandPos==='bottom'?1-rel:rel;
-  const cfC=Math.max(.02,Math.min(.48,cf));
-  obiCutFrac=cfC;
-  obiPgSettings.set(obiCurPageNum,{cutFrac:cfC,confidence:100,source:'manual'});
-  obi$('cutSlider').value=Math.round(cfC*100);
-  obiUpdateDots();
-  obiShowConf(obiPgSettings.get(obiCurPageNum));
-  obiRefreshOverlay();
-},{passive:true});
-document.addEventListener('mouseup',async()=>{
-  if(!obiDragging) return;
-  obiDragging=false;
-  if(obiCurDoc) obiRenderMini(await obiCurDoc.getPage(obiCurPageNum));
-});
-document.addEventListener('touchend',async()=>{
-  if(!obiDragging) return;
-  obiDragging=false;
-  if(obiCurDoc) obiRenderMini(await obiCurDoc.getPage(obiCurPageNum));
-});
-
 // Resize handler for obi
 let _obiRt;
 window.addEventListener('resize',()=>{
   clearTimeout(_obiRt);
   _obiRt=setTimeout(async()=>{
-    if(!obiCurDoc) return;
-    const pg=await obiCurDoc.getPage(obiCurPageNum);
-    const wrap=obi$('cwrap'),canvas=obi$('pc');
-    const vp=pg.getViewport({scale:wrap.clientWidth/pg.getViewport({scale:1}).width});
-    canvas.width=vp.width; canvas.height=vp.height;
-    await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
-    obiRefreshOverlay();
+    if(!obiCurDoc || !obiCurFileId) return;
+    await obiShowPage(obiCurPageNum);
   },300);
 });
 
@@ -6004,10 +6252,263 @@ function obiInit(){
   obi$('bandIn').addEventListener('change',e=>{if(e.target.files[0])obiLoadBand(e.target.files[0]);e.target.value='';});
   obiSetupDrop('pdfDrop',f=>f.name.toLowerCase().endsWith('.pdf')&&obiAddFiles([f]));
   obi$('pdfIn').addEventListener('change',e=>{obiAddFiles(Array.from(e.target.files));e.target.value='';});
-  obi$('cline').addEventListener('mousedown',e=>{obiDragging=true;e.preventDefault();});
-  obi$('cline').addEventListener('touchstart',e=>{obiDragging=true;e.preventDefault();},{passive:false});
+  obiSetupBoxInteraction('o-cutBox','cut');
+  obiSetupBoxInteraction('o-bandBox','band');
 }
 obiInit();
+
+/* ── 案内キット ── */
+let kitState = null;
+const KIT_DOC_LABELS = ['図面','資金計画表','類似物件','価格表','その他'];
+
+function kitAbToBase64(buf){
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let binary = '';
+  const chunk = 0x8000;
+  for(let i=0;i<bytes.length;i+=chunk){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+  }
+  return btoa(binary);
+}
+function kitGuessLabel(name){
+  const n=(name||'').toLowerCase();
+  if(n.indexOf('資金')>-1||n.indexOf('計画')>-1) return '資金計画表';
+  if(n.indexOf('類似')>-1) return '類似物件';
+  if(n.indexOf('価格')>-1) return '価格表';
+  return '図面';
+}
+function kitGuessMime(name){
+  const n=(name||'').toLowerCase();
+  if(n.endsWith('.png')) return 'image/png';
+  if(n.endsWith('.jpg')||n.endsWith('.jpeg')) return 'image/jpeg';
+  return 'application/pdf';
+}
+function kitFmtSize(bytes){
+  if(bytes < 1024*1024) return Math.round(bytes/1024) + 'KB';
+  return (bytes/1024/1024).toFixed(1) + 'MB';
+}
+
+async function kitOpen(custId){
+  const c = D.customers.find(x=>x.id===custId);
+  if(!c) return;
+  const props = D.properties.filter(p=>p.custIds?.includes(custId));
+  kitState = {
+    customerId: custId,
+    customerName: c.name || 'お客様',
+    visitDate: '',
+    properties: props.map(p => ({
+      cardId: uid(), propId: p.id, name: p.name || '(名称未設定)',
+      include: true, loading: true, docs: []
+    }))
+  };
+  showModal(kitModalHtml());
+  await Promise.all(kitState.properties.map(pc => kitLoadPropDocs(pc)));
+  kitRenderProps();
+}
+
+async function kitLoadPropDocs(pc){
+  try{
+    const rec = await dbGet(pc.propId);
+    if(rec && rec.data){
+      pc.docs.push({
+        id: uid(), label:'図面', filename: rec.fileName || '販売図面.pdf',
+        mime:'application/pdf', include:true,
+        data: kitAbToBase64(rec.data)
+      });
+    }
+  }catch(e){ console.error(e); }
+  try{
+    const docs = await dbDocList(pc.propId);
+    docs.forEach(d => {
+      if(!d.data) return;
+      pc.docs.push({
+        id: uid(), label: kitGuessLabel(d.fileName), filename: d.fileName,
+        mime: kitGuessMime(d.fileName), include:true,
+        data: kitAbToBase64(d.data)
+      });
+    });
+  }catch(e){ console.error(e); }
+  pc.loading = false;
+}
+
+function kitModalHtml(){
+  return `
+    <div class="modal modal-xl">
+      <div class="modal-hd">
+        <div>
+          <div class="modal-title">📦 案内キットを作成</div>
+          <div class="modal-subtitle">${esc(kitState.customerName)} 様 — iPhone/iPadでオフライン閲覧できる1ファイルにまとめます</div>
+        </div>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>案内日（任意）</label>
+          <input type="date" id="kit-visitDate" onchange="kitState.visitDate=this.value">
+        </div>
+        <div id="kit-proplist">${kitPropsHtml()}</div>
+        <button class="btn btn-secondary" style="width:100%;margin-top:6px" onclick="kitAddManualProperty()">＋ 物件を手動で追加（システム未登録の資料用）</button>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-primary" id="kit-genBtn" onclick="kitGenerate()">📦 案内キットを作成してダウンロード</button>
+      </div>
+    </div>`;
+}
+
+function kitPropsHtml(){
+  if(!kitState.properties.length){
+    return `<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:18px 0">
+      物件がまだありません。「＋ 物件を手動で追加」から資料を追加してください。
+    </div>`;
+  }
+  return kitState.properties.map(pc => {
+    const body = pc.loading
+      ? `<div style="font-size:12px;color:var(--text-muted);padding:8px 0">資料を読み込み中…</div>`
+      : (pc.docs.length
+          ? pc.docs.map(d => `
+            <div class="kit-doc-item">
+              <input type="checkbox" ${d.include?'checked':''} onchange="kitToggleDoc('${pc.cardId}','${d.id}')">
+              <span class="dn" title="${esc(d.filename)}">${esc(d.filename)}</span>
+              <select onchange="kitSetDocLabel('${pc.cardId}','${d.id}',this.value)">
+                ${KIT_DOC_LABELS.map(l=>`<option value="${l}" ${l===d.label?'selected':''}>${l}</option>`).join('')}
+              </select>
+              <span style="color:#cbd5e0;cursor:pointer;padding:2px 5px" onclick="kitRemoveDoc('${pc.cardId}','${d.id}')">✕</span>
+            </div>`).join('')
+          : `<div style="font-size:12px;color:var(--text-muted);padding:4px 0 8px">この物件には資料がありません</div>`);
+
+    return `
+      <div class="kit-prop-card">
+        <div class="kit-prop-top">
+          <input type="checkbox" ${pc.include?'checked':''} onchange="kitToggleProp('${pc.cardId}')">
+          ${pc.propId
+            ? `<strong style="flex:1">${esc(pc.name)}</strong>`
+            : `<input type="text" style="flex:1" placeholder="物件名（手動）" value="${esc(pc.name)}" oninput="kitSetManualName('${pc.cardId}',this.value)">`
+          }
+          <span style="color:#cbd5e0;cursor:pointer;padding:2px 6px" onclick="kitRemoveProperty('${pc.cardId}')">✕</span>
+        </div>
+        ${body}
+        <div class="kit-drop" onclick="document.getElementById('kit-file-${pc.cardId}').click()">
+          📎 資料を追加（PDF・画像）
+        </div>
+        <input type="file" id="kit-file-${pc.cardId}" accept=".pdf,application/pdf,image/*" multiple style="display:none"
+          onchange="kitAddFilesToCard('${pc.cardId}', this.files)">
+      </div>`;
+  }).join('');
+}
+
+function kitFindCard(cardId){ return kitState.properties.find(p=>p.cardId===cardId); }
+function kitRenderProps(){
+  const el = document.getElementById('kit-proplist');
+  if(el) el.innerHTML = kitPropsHtml();
+}
+function kitToggleProp(cardId){
+  const pc = kitFindCard(cardId); if(!pc) return;
+  pc.include = !pc.include;
+}
+function kitToggleDoc(cardId, docId){
+  const pc = kitFindCard(cardId); if(!pc) return;
+  const d = pc.docs.find(x=>x.id===docId); if(!d) return;
+  d.include = !d.include;
+}
+function kitSetDocLabel(cardId, docId, val){
+  const pc = kitFindCard(cardId); if(!pc) return;
+  const d = pc.docs.find(x=>x.id===docId); if(d) d.label = val;
+}
+function kitRemoveDoc(cardId, docId){
+  const pc = kitFindCard(cardId); if(!pc) return;
+  pc.docs = pc.docs.filter(x=>x.id!==docId);
+  kitRenderProps();
+}
+function kitRemoveProperty(cardId){
+  kitState.properties = kitState.properties.filter(p=>p.cardId!==cardId);
+  kitRenderProps();
+}
+function kitSetManualName(cardId, val){
+  const pc = kitFindCard(cardId); if(pc) pc.name = val;
+}
+function kitAddManualProperty(){
+  kitState.properties.push({ cardId:uid(), propId:null, name:'', include:true, loading:false, docs:[] });
+  kitRenderProps();
+}
+function kitReadFileAsBase64(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      resolve(result.slice(result.indexOf(',')+1));
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+async function kitAddFilesToCard(cardId, fileList){
+  const pc = kitFindCard(cardId); if(!pc) return;
+  const files = Array.prototype.filter.call(fileList, f => f.type==='application/pdf' || f.type.indexOf('image/')===0);
+  const datas = await Promise.all(files.map(f=>kitReadFileAsBase64(f)));
+  files.forEach((f,i) => {
+    pc.docs.push({ id:uid(), label:kitGuessLabel(f.name), filename:f.name, mime:f.type||'application/pdf', include:true, data:datas[i] });
+  });
+  kitRenderProps();
+}
+
+function kitGenerate(){
+  const btn = document.getElementById('kit-genBtn');
+  const custName = kitState.customerName;
+  const visitDate = document.getElementById('kit-visitDate')?.value || '';
+  const properties = kitState.properties
+    .filter(p => p.include && (p.name||'').trim())
+    .map(p => ({
+      name: p.name,
+      documents: p.docs.filter(d=>d.include).map(d => ({ label:d.label, filename:d.filename, mime:d.mime, data:d.data }))
+    }))
+    .filter(p => p.documents.length>0);
+
+  if(!properties.length){
+    toast('含める物件・資料を1件以上選択してください', 'err');
+    return;
+  }
+
+  btn.disabled = true;
+  try{
+    const kitData = { customerName: custName, visitDate, properties };
+    let jsonStr = JSON.stringify(kitData);
+    const closeSeq = '<' + '/script';
+    jsonStr = jsonStr.split(closeSeq).join('<\\/script');
+
+    let templateHtml = document.getElementById('kit-viewer-template').innerHTML;
+    templateHtml = templateHtml.split('__KIT_DATA_JSON__').join(jsonStr);
+
+    const titleSafe = esc(custName + ' 様 ご案内資料');
+    const finalHtml =
+      '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">' +
+      '<title>' + titleSafe + '</title></head><body>' +
+      templateHtml +
+      '</body></html>';
+
+    const blob = new Blob([finalHtml], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    const dateStr = visitDate || new Date().toISOString().slice(0,10);
+    const safeCust = (custName||'顧客').replace(/[\\\/:*?"<>|]/g,'_');
+    kitTriggerDl(url, `案内キット_${safeCust}_${dateStr}.html`);
+    toast('案内キットを作成しました ✅', 'ok');
+    closeModal();
+  }catch(err){
+    console.error(err);
+    toast('作成に失敗しました: ' + err.message, 'err');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function kitTriggerDl(url, name){
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+}
+
 
 /* ── Bootstrap ── */
 openIDB().then(async () => {
