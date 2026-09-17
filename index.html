@@ -1008,6 +1008,46 @@ async function sbManualSync() {
   else { await sbPush(); toast('クラウドに保存しました', 'ok'); }
 }
 
+function idbListAll(storeName) {
+  return new Promise(res => {
+    if (!idb) { res([]); return; }
+    const list = [];
+    const tx = idb.transaction(storeName, 'readonly');
+    tx.objectStore(storeName).openCursor().onsuccess = e => {
+      const cur = e.target.result;
+      if (cur) { list.push(cur.value); cur.continue(); }
+      else res(list);
+    };
+  });
+}
+
+async function sbUploadAllFiles() {
+  if (!sbClient) { toast('クラウド未接続です', 'err'); return; }
+  const statusEl = document.getElementById('sb-upload-status');
+  const btn = document.getElementById('sb-upload-btn');
+  if (btn) btn.disabled = true;
+  const setStatus = (msg) => { if (statusEl) statusEl.textContent = msg; };
+
+  setStatus('ファイル一覧を確認しています…');
+  const pdfs = await idbListAll('pdfs');
+  const docs = await idbListAll('docs');
+  const total = pdfs.length + docs.length;
+  if (!total) { setStatus('この端末にアップロード対象のファイルはありません'); if (btn) btn.disabled = false; return; }
+
+  let done = 0, ok = 0, fail = 0;
+  for (const rec of pdfs) {
+    setStatus(`アップロード中… (${++done}/${total}) ${rec.fileName || ''}`);
+    (await sbUploadFile(`pdfs/${rec.id}`, rec.data)) ? ok++ : fail++;
+  }
+  for (const rec of docs) {
+    setStatus(`アップロード中… (${++done}/${total}) ${rec.fileName || ''}`);
+    (await sbUploadFile(`docs/${rec.id}`, rec.data)) ? ok++ : fail++;
+  }
+  setStatus(`完了：成功 ${ok}件 ／ 失敗 ${fail}件（全${total}件）`);
+  toast(`ファイルのアップロードが完了しました（成功${ok}件）`, fail ? 'err' : 'ok');
+  if (btn) btn.disabled = false;
+}
+
 function showSBSettings() {
   const cfg = getSBCfg();
   showModal(`
@@ -1051,12 +1091,19 @@ create policy "allow_files" on storage.objects
             style="font-family:monospace;font-size:12px">
         </div>
         <div class="form-group">
-          <label>anon public key <span class="req">*</span></label>
+          <label>anon public key（Publishable key）<span class="req">*</span></label>
           <input type="password" id="sb-key" value="${ea(cfg.anonKey||'')}"
-            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... または sb_publishable_..."
             style="font-family:monospace;font-size:11px">
         </div>
         ${sbClient ? `<div style="background:#f0fff4;border:1px solid #9ae6b4;border-radius:6px;padding:8px 12px;font-size:12px;color:#276749">✅ 接続中 — データは自動的にクラウドへ同期されます</div>` : ''}
+        ${sbClient ? `
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:600;margin-bottom:4px">📤 既存の図面・資料をアップロード</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">クラウド接続より前に登録した図面PDFは自動では送信されていません。<strong>ファイルの実物があるこの端末（通常はPC）で一度だけ</strong>実行してください。</div>
+          <button class="btn btn-secondary" id="sb-upload-btn" style="width:100%" onclick="sbUploadAllFiles()">📤 この端末の図面・資料をクラウドへ一括アップロード</button>
+          <div id="sb-upload-status" style="font-size:11px;color:var(--text-muted);margin-top:6px"></div>
+        </div>` : ''}
       </div>
       <div class="modal-ft">
         <button class="btn btn-secondary" onclick="closeModal()">閉じる</button>
