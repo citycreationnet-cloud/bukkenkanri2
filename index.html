@@ -1872,7 +1872,19 @@ function renderProps() {
   }
 
   document.getElementById('cnt').innerHTML = h;
-  if (vmode === 'grid') list.forEach(p => loadThumb(p.id));
+  if (vmode === 'grid') loadThumbsThrottled(list.map(p=>p.id));
+}
+
+async function loadThumbsThrottled(ids, limit = 3) {
+  let idx = 0;
+  async function worker() {
+    while (idx < ids.length) {
+      const id = ids[idx++];
+      await loadThumb(id);
+    }
+  }
+  const workers = Array.from({ length: Math.min(limit, ids.length) }, worker);
+  await Promise.all(workers);
 }
 
 async function loadThumb(id) {
@@ -1880,15 +1892,24 @@ async function loadThumb(id) {
   if (!el) return;
   const rec = await dbGet(id);
   if (!rec) { el.innerHTML = '<div class="no-pdf">📄<br>図面なし</div>'; return; }
+  let pdf;
   try {
-    const pdf  = await pdfjsLib.getDocument({ data: new Uint8Array(rec.data) }).promise;
+    pdf  = await pdfjsLib.getDocument({ data: new Uint8Array(rec.data) }).promise;
     const pg   = await pdf.getPage(1);
     const vp   = pg.getViewport({ scale: .5 });
     const cv   = document.createElement('canvas');
     cv.width   = vp.width; cv.height = vp.height;
     await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
-    el.innerHTML = ''; el.style.background = '#fff'; el.appendChild(cv);
-  } catch(_) { el.innerHTML = '<div class="no-pdf">📄<br>PDF</div>'; }
+    // Re-check the thumbnail slot is still on screen (list may have re-rendered
+    // while this was loading) before touching the DOM.
+    const stillThere = document.getElementById(`th-${id}`);
+    if (stillThere) { stillThere.innerHTML = ''; stillThere.style.background = '#fff'; stillThere.appendChild(cv); }
+  } catch(_) {
+    const stillThere = document.getElementById(`th-${id}`);
+    if (stillThere) stillThere.innerHTML = '<div class="no-pdf">📄<br>PDF</div>';
+  } finally {
+    if (pdf) { try { await pdf.destroy(); } catch(_) {} }
+  }
 }
 
 /* ── Property Detail ── */
